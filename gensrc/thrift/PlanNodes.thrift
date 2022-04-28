@@ -367,7 +367,7 @@ enum TJoinDistributionMode {
   NONE,
   BROADCAST,
   PARTITIONED,
-  LOCAL_HASH_BUCKET,
+  LOCAL_HASH_BUCKET,//跟下边的啥区别？
   SHUFFLE_HASH_BUCKET,
   COLOCATE,
   REPLICATED
@@ -401,7 +401,7 @@ struct THashJoinNode {
 
   52: optional TJoinDistributionMode distribution_mode;
   53: optional list<Exprs.TExpr> partition_exprs
-  54: optional list<Types.TSlotId> output_columns
+  54: optional list<Types.TSlotId> output_columns//这里是确定最终的输出列吗？
 }
 
 struct TMergeJoinNode {
@@ -433,6 +433,7 @@ struct TMergeJoinNode {
   52: optional TJoinDistributionMode distribution_mode;
   53: optional list<Exprs.TExpr> partition_exprs
   54: optional list<Types.TSlotId> output_columns
+  55: required list<TEqJoinCondition> cmp_conjuncts
 }
 
 enum TAggregationOp {
@@ -878,7 +879,7 @@ struct TPlanNode {
   // Columns that null values can be filtered out
   58: optional list<Types.TSlotId> filter_null_value_columns;
   // for outer join and cross join
-  59: optional bool need_create_tuple_columns;
+  59: optional bool need_create_tuple_columns;//ok，这里暗示可以不管
   // Scan node for jdbc
   60: optional TJDBCScanNode jdbc_scan_node;
 
