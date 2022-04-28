@@ -46,6 +46,8 @@
 #include "exec/vectorized/except_node.h"
 #include "exec/vectorized/file_scan_node.h"
 #include "exec/vectorized/hash_join_node.h"
+#include "exec/vectorized/merge_join_node.h"
+#include "exec/vectorized/hdfs_scan_node.h"
 #include "exec/vectorized/intersect_node.h"
 #include "exec/vectorized/olap_meta_scan_node.h"
 #include "exec/vectorized/olap_scan_node.h"
@@ -75,7 +77,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
           _type(tnode.node_type),
           _pool(pool),
           _tuple_ids(tnode.row_tuples),
-          _row_descriptor(descs, tnode.row_tuples, tnode.nullable_tuples),
+          _row_descriptor(descs, tnode.row_tuples, tnode.nullable_tuples),//descs是全局的数据结构，二参是决定用了哪些row_tuple
           _resource_profile(tnode.resource_profile),
           _debug_phase(TExecNodePhase::INVALID),
           _debug_action(TDebugAction::WAIT),
@@ -332,7 +334,7 @@ Status ExecNode::close(RuntimeState* state) {
 
     return result;
 }
-
+//看来ExecNode实际就是在这里被构造的，看下描述符集合是不是在整个查询过程中都是不变的。
 Status ExecNode::create_tree(RuntimeState* state, ObjectPool* pool, const TPlan& plan, const DescriptorTbl& descs,
                              ExecNode** root) {
     if (plan.nodes.size() == 0) {
