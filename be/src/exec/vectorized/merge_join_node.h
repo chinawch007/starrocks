@@ -18,6 +18,7 @@ class ExprContext;
 
 namespace vectorized {
 class ColumnRef;
+class RuntimeFilterBuildDescriptor;
 
 class MergeJoinNode final : public ExecNode {
 
@@ -29,13 +30,40 @@ public:
         }
     }
 
+    Status init(const TPlanNode& tnode, RuntimeState* state);
+    Status prepare(RuntimeState* state) override;
+    Status open(RuntimeState* state) override;
+    Status get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos) override;
+    Status close(RuntimeState* state) override;
     pipeline::OpFactories decompose_to_pipeline(pipeline::PipelineBuilderContext* context) override;
 private:
+    Status _build(RuntimeState* state);
+    Status _probe(RuntimeState* state, ScopedTimer<MonotonicStopWatch>& probe_timer, ChunkPtr* chunk, bool& eos);
+    //Status _probe_remain(ChunkPtr* chunk, bool& eos);
+
+    ChunkPtr _right_chunk;//看看怎么初始化下 
+    ChunkPtr _left_chunk;
+    ChunkPtr _result_chunk;
+
     friend ExecNode;
     // _hash_join_node is used to construct HashJoiner, the reference is sound since
     // it's only used in FragmentExecutor::prepare function.
-    const TMergeJoinNode& _hash_join_node;
+    const TMergeJoinNode& _merge_join_node;
+    std::vector<ExprContext*> _probe_expr_ctxs;
+    std::vector<ExprContext*> _build_expr_ctxs;
+    //std::vector<ExprContext*> _other_join_conjunct_ctxs;
+    //std::vector<bool> _is_null_safes;
 
+    //std::vector<ExprContext*> _probe_equivalence_partition_expr_ctxs;
+    //std::vector<ExprContext*> _build_equivalence_partition_expr_ctxs;
+
+    TJoinOp::type _join_type = TJoinOp::INNER_JOIN;
+    TJoinDistributionMode::type _distribution_mode = TJoinDistributionMode::NONE;
+    std::set<SlotId> _output_slots;
+    bool _eos = false;
+
+    Buffer<MergeTableSlotDescriptor> right_slots;
+    Buffer<MergeTableSlotDescriptor> left_slots;
 }
 
 

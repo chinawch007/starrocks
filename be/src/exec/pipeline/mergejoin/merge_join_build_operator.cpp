@@ -13,12 +13,11 @@ MergeJoinBuildOperator::MergeJoinBuildOperator(OperatorFactory* factory, int32_t
           _join_builder(std::move(join_builder)),
           _driver_sequence(driver_sequence){}
 
-//当前假设入参chunk未排序。
 Status MergeJoinBuildOperator::push_chunk(RuntimeState* state, const vectorized::ChunkPtr& chunk) {
     return _join_builder->append_chunk_to_buffer(state, chunk);
 }
 
-Status MergeJoinBuildOperator::prepare(RuntimeState* state) {
+Status MergeJoinBuildOperator::prepare(RuntimeState* state) {//state还需要我传给joiner吗？
     RETURN_IF_ERROR(Operator::prepare(state));
 
     _join_builder->ref();
@@ -40,9 +39,9 @@ StatusOr<vectorized::ChunkPtr> MergeJoinBuildOperator::pull_chunk(RuntimeState* 
     return Status::NotSupported(msg);
 }
 
-void MergeJoinBuildOperator::set_finishing(RuntimeState* state) {//注意这里的步骤顺序
-    _is_finished = true;//直接跳过1个阶段了，注意跟joiner那边阶段的对应。
-    _join_builder->sort_buffer(state);//对所有输入块进行排序，这些块当前估计是内存乱序，我们也要考虑到磁盘上也有的可能。
+//这里其实没有进入finished的一个步骤
+void MergeJoinBuildOperator::set_finishing(RuntimeState* state) {
+    //_join_builder->sort_buffer(state);//对所有输入块进行排序，这些块当前估计是内存乱序，我们也要考虑到磁盘上也有的可能。
     _join_builder->enter_probe_phase();//是说build阶段收集排序，probe阶段对齐？
 }
 
@@ -51,7 +50,7 @@ MergeJoinBuildOperatorFactory::MergeJoinBuildOperatorFactory(//传入一个joine
         : OperatorFactory(id, "mereg_join_build", plan_node_id),
           _merge_joiner_factory(std::move(merge_joiner_factory)){}
 
-Status MergeJoinBuildOperatorFactory::prepare(RuntimeState* state) {//父类定义的函数
+Status MergeJoinBuildOperatorFactory::prepare(RuntimeState* state) {//从这里调用的场景是什么？
     RETURN_IF_ERROR(OperatorFactory::prepare(state));
     return _merge_joiner_factory->prepare(state);//生疏
 }
@@ -62,8 +61,9 @@ void MergeJoinBuildOperatorFactory::close(RuntimeState* state) {
 }
 
 OperatorPtr MergeJoinBuildOperatorFactory::create(int32_t degree_of_parallelism, int32_t driver_sequence) {
-    return std::make_shared<MergeJoinBuildOperator>(this, _id, _name, _plan_node_id,
-                                                   _merge_joiner_factory->create_builder(driver_sequence));
+    return std::make_shared<MergeJoinBuildOperator>(this, _id, _name, _plan_node_id,//name的话是这里的初始参数
+                                                   _merge_joiner_factory->create_builder(driver_sequence),
+                                                   driver_sequence);
 }
 
 }

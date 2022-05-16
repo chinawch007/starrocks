@@ -67,6 +67,8 @@ set(EXEC_FILES
     vectorized/hash_joiner.cpp
     vectorized/hash_join_node.cpp
     vectorized/join_hash_map.cpp
+    vectorized/merge_joiner.cpp
+    vectorized/merge_join_node.cpp
     vectorized/topn_node.cpp
     vectorized/chunks_sorter.cpp
     vectorized/chunks_sorter_heap_sort.cpp
@@ -175,6 +177,9 @@ set(EXEC_FILES
     pipeline/hashjoin/hash_join_build_operator.cpp
     pipeline/hashjoin/hash_join_probe_operator.cpp
     pipeline/hashjoin/hash_joiner_factory.cpp
+    pipeline/mergejoin/merge_join_build_operator.cpp
+    pipeline/mergejoin/merge_join_probe_operator.cpp
+    pipeline/mergejoin/merge_joiner_factory.cpp
     pipeline/set/except_context.cpp
     pipeline/set/except_build_sink_operator.cpp
     pipeline/set/except_probe_sink_operator.cpp

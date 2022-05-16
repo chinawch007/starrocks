@@ -16,7 +16,7 @@ using MergeJoiner = starrocks::vectorized::MergeJoiner;
 class MergeJoinProbeOperator final : public OperatorWithDependency {//跟builder父类不一样。
 public:
     MergeJoinProbeOperator(OperatorFactory* factory, int32_t id, const string& name, int32_t plan_node_id,
-                          MergeJoinerPtr join_prober, MergeJoinerPtr join_builder);
+                          MergeJoinerPtr join_prober);
     ~MergeJoinProbeOperator() override = default;
 
     Status prepare(RuntimeState* state) override;
@@ -39,9 +39,7 @@ public:
     StatusOr<vectorized::ChunkPtr> pull_chunk(RuntimeState* state);
 
 private:
-    const MergeJoinerPtr _join_prober;//这部分是什么意思，是说build和probe之间可能有网络不在一台机器上吗？
-    const MergeJoinerPtr _join_builder;
-    bool _is_finished = false;
+    const MergeJoinerPtr _join_prober;
 };
 
 class MergeJoinProbeOperatorFactory final : public OperatorFactory {

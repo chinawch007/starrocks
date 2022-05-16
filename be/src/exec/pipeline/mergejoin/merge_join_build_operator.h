@@ -6,7 +6,7 @@
 
 #include <atomic>
 
-#include "exec/pipeline/mergejoin/merge_joiner_factory.h"//这文件你还没写呢
+#include "exec/pipeline/mergejoin/merge_joiner_factory.h"
 #include "exec/pipeline/operator.h"
 #include "exec/pipeline/pipeline_fwd.h"
 #include "exec/vectorized/merge_joiner.h"
@@ -32,11 +32,13 @@ public:
         CHECK(false) << "has_output not supported in MergeJoinBuildOperator";
         return false;
     }
+    //这里其实有点矛盾，其实到了probe阶段就不会再接收数据了，我只能任务这里再调用过set_finishing之后就不会再调这个need_input了
     bool need_input() const override { return !is_finished(); }
 
-    //为啥没有set_finished
+    //set_finished用父类的函数了
     void set_finishing(RuntimeState* state) override;
-    bool is_finished() const override { return _is_finished || _join_builder->is_finished(); }
+    //我怀疑这里是轮询，并且是在joiner那边自我finished之后，所以
+    bool is_finished() const override { return _join_builder->is_finished(); }
 
     Status push_chunk(RuntimeState* state, const vectorized::ChunkPtr& chunk) override;
     StatusOr<vectorized::ChunkPtr> pull_chunk(RuntimeState* state) override;
@@ -47,13 +49,12 @@ public:
 
 private:
     MergeJoinerPtr _join_builder;
-    // Assign the readable hash table from _join_builder to each only probe hash_joiner,
-    // when _join_builder finish building the hash tbale.
-    bool _is_finished = false;
+    size_t _driver_sequence;
 };
 
+//这里的参数肯定是和上边的保持一致的。
 class MergeJoinBuildOperatorFactory final : public OperatorFactory {
-public:
+public://看看实际生成op的参数，多余的是怎么得来的
     MergeJoinBuildOperatorFactory(int32_t id, int32_t plan_node_id, MergeJoinerFactoryPtr merge_joiner_factory);
     ~MergeJoinBuildOperatorFactory() override = default;
     Status prepare(RuntimeState* state) override;

@@ -432,6 +432,9 @@ Status ExecNode::create_vectorized_node(starrocks::RuntimeState* state, starrock
     case TPlanNodeType::HASH_JOIN_NODE:
         *node = pool->add(new vectorized::HashJoinNode(pool, tnode, descs));
         return Status::OK();
+    case TPlanNodeType::MERGE_JOIN_NODE:
+        *node = pool->add(new vectorized::MergeJoinNode(pool, tnode, descs));
+        return Status::OK();
     case TPlanNodeType::ANALYTIC_EVAL_NODE:
         *node = pool->add(new vectorized::AnalyticNode(pool, tnode, descs));
         return Status::OK();

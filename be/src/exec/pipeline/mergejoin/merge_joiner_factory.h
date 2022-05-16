@@ -39,7 +39,7 @@ public:
 
 private:
     starrocks::vectorized::MergeJoinerParam _param;
-    MergeJoiners _hash_joiners;//管理结构就一个，其中有的是build，有的是probe
+    MergeJoiners _merge_joiners;//管理结构就一个，其中有的是build，有的是probe
 };
 
 }
