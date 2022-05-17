@@ -189,7 +189,7 @@ std::unique_ptr<Chunk> Chunk::clone_unique() const {
     chunk->check_or_die();
     return chunk;
 }
-
+//白惊喜一场，都一样的。
 void Chunk::append_selective(const Chunk& src, const uint32_t* indexes, uint32_t from, uint32_t size) {
     DCHECK_EQ(_columns.size(), src.columns().size());
     for (size_t i = 0; i < _columns.size(); ++i) {
@@ -208,7 +208,7 @@ void Chunk::rolling_append_selective(Chunk& src, const uint32_t* indexes, uint32
 }
 
 size_t Chunk::filter(const Buffer<uint8_t>& selection) {
-    for (auto& column : _columns) {
+    for (auto& column : _columns) {//这个地方描述的挺好的，一个chunk多个列
         column->filter(selection);
     }
     return num_rows();

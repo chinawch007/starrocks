@@ -54,7 +54,7 @@ int64_t ConstColumn::xor_checksum(uint32_t from, uint32_t to) const {
     return 0;
 }
 
-size_t ConstColumn::filter_range(const Column::Filter& filter, size_t from, size_t to) {
+size_t ConstColumn::filter_range(const Column::Filter& filter, size_t from, size_t to) {//这里似乎并没有过滤？
     size_t count = SIMD::count_nonzero(&filter[from], to - from);
     this->resize(from + count);
     return from + count;

@@ -284,8 +284,8 @@ public:
     // - if nan_direction_hint ==  1, NaN and NULLs are considered as greatest than everything other.
     // For example, if nan_direction_hint == -1 is used by descending sorting, NaNs will be at the end.
     //
-    // For non Nullable and non floating point types, nan_direction_hint is ignored.
-    virtual int compare_at(size_t left, size_t right, const Column& rhs, int nan_direction_hint) const = 0;
+    // For non Nullable and non floating point types, nan_direction_hint is ignored.看get时无意间发现这个函数，直接用这个比较就行了，不用把实际数据拿出来。
+virtual int compare_at(size_t left, size_t right, const Column& rhs, int nan_direction_hint) const = 0;
 
     // Compute fvn hash, mainly used by shuffle column data
     // Note: shuffle hash function should be different from Aggregate and Join Hash map hash function

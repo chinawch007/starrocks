@@ -105,7 +105,7 @@ template <PrimitiveType primitive_type>
 struct RunTimeTypeTraits {};
 
 template <>
-struct RunTimeTypeTraits<TYPE_BOOLEAN> {
+struct RunTimeTypeTraits<TYPE_BOOLEAN> {//所以这个地方是很重要的，偏特化的参数是enum，cpptype是真实类型，另外一个是列类型
     using CppType = uint8_t;
     using ColumnType = BooleanColumn;
 };

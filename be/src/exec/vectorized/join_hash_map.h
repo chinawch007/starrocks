@@ -39,7 +39,7 @@ namespace starrocks::vectorized {
     M(fixed64)                     \
     M(fixed128)
 
-enum class JoinHashMapType {
+enum class JoinHashMapType {//指的是哪部分？key部分？
     empty,
     keyboolean,
     key8,
@@ -74,10 +74,10 @@ struct HashTableSlotDescriptor {
     bool need_output;
 };
 
-struct JoinHashTableItems {
+struct JoinHashTableItems {//是hashmap的主要成员，hashmap除了他没别的啥有用成员了。
     //TODO: memory continus problem?
-    ChunkPtr build_chunk = nullptr;
-    Columns key_columns;
+    ChunkPtr build_chunk = nullptr;//这是一整个chunk吗？
+    Columns key_columns;//这里是关联列，上边是全列？
     Buffer<HashTableSlotDescriptor> build_slots;
     Buffer<HashTableSlotDescriptor> probe_slots;
     Buffer<TupleId> output_build_tuple_ids;
@@ -549,12 +549,12 @@ private:
     HashTableProbeState* _probe_state = nullptr;
 };
 
-#define JoinHashMapForOneKey(PT) JoinHashMap<PT, JoinBuildFunc<PT>, JoinProbeFunc<PT>>
+#define JoinHashMapForOneKey(PT) JoinHashMap<PT, JoinBuildFunc<PT>, JoinProbeFunc<PT>>//单key类型，pt指的是什么？
 #define JoinHashMapForDirectMapping(PT) JoinHashMap<PT, DirectMappingJoinBuildFunc<PT>, DirectMappingJoinProbeFunc<PT>>
 #define JoinHashMapForFixedSizeKey(PT) JoinHashMap<PT, FixedSizeJoinBuildFunc<PT>, FixedSizeJoinProbeFunc<PT>>
 #define JoinHashMapForSerializedKey(PT) JoinHashMap<PT, SerializedJoinBuildFunc, SerializedJoinProbeFunc>
 
-class JoinHashTable {
+class JoinHashTable {//跟上边的map啥关系？外边用的就是它，看来是某种形式把上边给包含了
 public:
     JoinHashTable() = default;
     ~JoinHashTable() = default;
@@ -604,7 +604,7 @@ private:
     void _remove_duplicate_index_for_right_anti_join(Column::Filter* filter);
     void _remove_duplicate_index_for_full_outer_join(Column::Filter* filter);
 
-    std::unique_ptr<JoinHashMapForDirectMapping(TYPE_BOOLEAN)> _keyboolean = nullptr;
+    std::unique_ptr<JoinHashMapForDirectMapping(TYPE_BOOLEAN)> _keyboolean = nullptr;//用这种方式吗？用谁就把谁构造出来？
     std::unique_ptr<JoinHashMapForDirectMapping(TYPE_TINYINT)> _key8 = nullptr;
     std::unique_ptr<JoinHashMapForDirectMapping(TYPE_SMALLINT)> _key16 = nullptr;
     std::unique_ptr<JoinHashMapForOneKey(TYPE_INT)> _key32 = nullptr;

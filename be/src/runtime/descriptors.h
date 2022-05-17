@@ -75,9 +75,9 @@ struct NullIndicatorOffset {
 
 std::ostream& operator<<(std::ostream& os, const NullIndicatorOffset& null_indicator);
 
-class SlotDescriptor {
+class SlotDescriptor {//既然是描述的话，肯定是不包含数据的
 public:
-    SlotId id() const { return _id; }
+    SlotId id() const { return _id; }//这个值一般是怎么得来的？
     const TypeDescriptor& type() const { return _type; }
     TypeDescriptor& type() { return _type; }
     TupleId parent() const { return _parent; }
@@ -118,7 +118,7 @@ private:
     const std::string _col_name;
 
     // the idx of the slot in the tuple descriptor (0-based).
-    // this is provided by the FE
+    // this is provided by the FE//这意思他是个表结构定义，而不是实际的元组数据？
     const int _slot_idx;
 
     // the byte size of this slot.
@@ -346,7 +346,7 @@ private:
     int _byte_size;
     int _num_null_slots;
     int _num_null_bytes;
-    std::vector<SlotDescriptor*> _slots; // contains all slots
+    std::vector<SlotDescriptor*> _slots; // contains all slots因为要在元组里描述列，所有用了不同于column的另一个词slot？
     // For a low cardinality string column with global dict,
     // The type in _slots is int, in _decode_slots is varchar
     std::vector<SlotDescriptor*> _decoded_slots;
@@ -363,7 +363,7 @@ private:
     std::vector<SlotDescriptor*> slots_ordered_by_idx() const;
 };
 
-class DescriptorTbl {
+class DescriptorTbl {//这里应该是描述符的集中类，不是描述表的，这里应该是fe传过来的概念集中地。
 public:
     // Creates a descriptor tbl within 'pool' from thrift_tbl and returns it via 'tbl'.
     // Returns OK on success, otherwise error (in which case 'tbl' will be unset).
@@ -390,7 +390,7 @@ private:
     DescriptorTbl() {}
 };
 
-// Records positions of tuples within row produced by ExecNode.
+// Records positions of tuples within row produced by ExecNode.//被execnode生成怎么理解？
 // TODO: this needs to differentiate between tuples contained in row
 // and tuples produced by ExecNode (parallel to PlanNode.rowTupleIds and
 // PlanNode.tupleIds); right now, we conflate the two (and distinguish based on
@@ -421,7 +421,7 @@ public:
     // dummy descriptor, needed for the JNI EvalPredicate() function
     RowDescriptor() = default;
 
-    // Returns total size in bytes.
+    // Returns total size in bytes.也就是说你不是定义出来的描述，也是实际的数据？
     // TODO: also take avg string lengths into account, ie, change this
     // to GetAvgRowSize()
     int get_row_size() const;
@@ -476,7 +476,7 @@ private:
     void init_has_varlen_slots();
 
     // map from position of tuple w/in row to its descriptor
-    std::vector<TupleDescriptor*> _tuple_desc_map;
+    std::vector<TupleDescriptor*> _tuple_desc_map;//按字面理解是一个row对应多个tuple。
 
     // _tuple_idx_nullable_map[i] is true if tuple i can be null
     std::vector<bool> _tuple_idx_nullable_map;

@@ -342,7 +342,7 @@ RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TT
     DCHECK_GT(row_tuples.size(), 0);
     _num_null_slots = 0;
 
-    for (int row_tuple : row_tuples) {
+    for (int row_tuple : row_tuples) {//所以这里使用全局数据结构进行组装的，在生成节点的时候，而每个tuple还包含了多个slot
         TupleDescriptor* tupleDesc = desc_tbl.get_tuple_descriptor(row_tuple);
         _num_null_slots += tupleDesc->num_null_slots();
         _tuple_desc_map.push_back(tupleDesc);
@@ -502,7 +502,7 @@ std::string RowDescriptor::debug_string() const {
 
     return ss.str();
 }
-
+//就是用thrift结构构造了下be这边的结构。
 Status DescriptorTbl::create(ObjectPool* pool, const TDescriptorTable& thrift_tbl, DescriptorTbl** tbl,
                              int32_t chunk_size) {
     *tbl = pool->add(new DescriptorTbl());
@@ -579,7 +579,7 @@ Status DescriptorTbl::create(ObjectPool* pool, const TDescriptorTable& thrift_tb
             return Status::InternalError("unknown tid in slot descriptor msg");
         }
 
-        entry->second->add_slot(slot_d);
+        entry->second->add_slot(slot_d);//slot组装到tuple中是在这里。
     }
 
     return Status::OK();

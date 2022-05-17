@@ -57,7 +57,7 @@ struct HashJoinerParam {
             : _pool(pool),
               _hash_join_node(hash_join_node),
               _node_id(node_id),
-              _node_type(node_type),
+              _node_type(node_type),//这也是没用到的？
               _is_null_safes(is_null_safes),
               _build_expr_ctxs(build_expr_ctxs),
               _probe_expr_ctxs(probe_expr_ctxs),
@@ -141,7 +141,7 @@ public:
     StatusOr<ChunkPtr> pull_chunk(RuntimeState* state);
 
     std::list<ExprContext*>& get_runtime_in_filters() { return _runtime_in_filters; }
-    std::list<RuntimeFilterBuildDescriptor*>& get_runtime_bloom_filters() { return _build_runtime_filters; }
+    std::list<RuntimeFilterBuildDescriptor*>& get_runtime_bloom_filters() { return _build_runtime_filters; }//这个是build阶段构造的那个吗？
     std::list<pipeline::RuntimeBloomFilterBuildParam>& get_runtime_bloom_filter_build_params() {
         return _runtime_bloom_filter_build_params;
     }
@@ -164,8 +164,8 @@ private:
 
     void _prepare_key_columns(Columns& key_columns, const ChunkPtr& chunk, const vector<ExprContext*>& expr_ctxs) {
         key_columns.resize(0);
-        for (auto& expr_ctx : expr_ctxs) {
-            ColumnPtr column_ptr = expr_ctx->evaluate(chunk.get());
+        for (auto& expr_ctx : expr_ctxs) {//每部分对应一列
+            ColumnPtr column_ptr = expr_ctx->evaluate(chunk.get());//这里是指向chunk里边吗？还是另生成的？
             if (column_ptr->only_null()) {
                 ColumnPtr column = ColumnHelper::create_column(expr_ctx->root()->type(), true);
                 column->append_nulls(chunk->num_rows());
@@ -175,14 +175,14 @@ private:
                 const_column->data_column()->assign(chunk->num_rows(), 0);
                 key_columns.emplace_back(const_column->data_column());
             } else {
-                key_columns.emplace_back(column_ptr);
+                key_columns.emplace_back(column_ptr);//所以这里终究会包含输入的所有列，只是对上述两种特殊情况做了特殊的处理？
             }
         }
     }
 
     void _prepare_build_key_columns() {
-        SCOPED_TIMER(_build_conjunct_evaluate_timer);
-        _prepare_key_columns(_ht.get_key_columns(), _ht.get_build_chunk(), _build_expr_ctxs);
+        SCOPED_TIMER(_build_conjunct_evaluate_timer);//按照这里的使用场景，chunk中肯定是有值的，也只在建表的时候调用了一次。
+        _prepare_key_columns(_ht.get_key_columns(), _ht.get_build_chunk(), _build_expr_ctxs);//这里的块是什么块呢？
     }
 
     void _prepare_probe_key_columns() {
@@ -190,7 +190,7 @@ private:
         _prepare_key_columns(_key_columns, _probe_input_chunk, _probe_expr_ctxs);
     }
 
-    bool _need_post_probe() const {
+    bool _need_post_probe() const {//统一特征是都需要右表的anti部分。
         return _join_type == TJoinOp::RIGHT_OUTER_JOIN || _join_type == TJoinOp::RIGHT_ANTI_JOIN ||
                _join_type == TJoinOp::FULL_OUTER_JOIN;
     }
@@ -330,7 +330,7 @@ private:
 
     const std::vector<bool>& _is_null_safes;
     // Equal conjuncts in Join On.
-    const std::vector<ExprContext*>& _build_expr_ctxs;
+    const std::vector<ExprContext*>& _build_expr_ctxs;//会用在prepare和生产rf中，所以mj那边没要这个。
     // Equal conjuncts in Join On.
     const std::vector<ExprContext*>& _probe_expr_ctxs;
     // Conjuncts in Join On except equal conjuncts.
@@ -352,9 +352,9 @@ private:
 
     bool _is_push_down = false;
 
-    JoinHashTable _ht;
+    JoinHashTable _ht;//read only谁给赋的这个值？
 
-    Columns _key_columns;
+    Columns _key_columns;//这里是匹配所需的列吗？这个值看来是经常性变动的。
     size_t _probe_column_count = 0;
     size_t _build_column_count = 0;
 

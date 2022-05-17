@@ -59,7 +59,7 @@ public:
 
     bool is_timestamp() const override { return IsTimestamp<ValueType>; }
 
-    const uint8_t* raw_data() const override { return reinterpret_cast<const uint8_t*>(_data.data()); }
+    const uint8_t* raw_data() const override { return reinterpret_cast<const uint8_t*>(_data.data()); }//这是从vector底层拿数据？
 
     uint8_t* mutable_raw_data() override { return reinterpret_cast<uint8_t*>(_data.data()); }
 
@@ -167,7 +167,7 @@ public:
 
     std::string get_name() const override;
 
-    Container& get_data() { return _data; }
+    Container& get_data() { return _data; }//这个不是父类的虚函数啊。。。其他列类没有咋整。。。
 
     const Container& get_data() const { return _data; }
 

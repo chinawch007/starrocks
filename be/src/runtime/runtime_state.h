@@ -63,7 +63,7 @@ class QueryContext;
 
 // A collection of items that are part of the global state of a
 // query and shared across all execution nodes of that query.
-class RuntimeState {
+class RuntimeState {//单个查询对应的全局状态。
 public:
     // for ut only
     RuntimeState(const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,

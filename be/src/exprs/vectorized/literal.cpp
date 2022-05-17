@@ -115,7 +115,7 @@ VectorizedLiteral::VectorizedLiteral(const TExprNode& node) : Expr(node) {
         _value = const_column_from_literal<TYPE_DECIMAL32>(node, this->type().precision, this->type().scale);
         break;
     }
-    case TYPE_DECIMAL64: {
+    case TYPE_DECIMAL64: {//value是个列，所以核心就是这个列？
         _value = const_column_from_literal<TYPE_DECIMAL64>(node, this->type().precision, this->type().scale);
         break;
     }

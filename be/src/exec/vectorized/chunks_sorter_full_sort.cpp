@@ -257,7 +257,7 @@ Status ChunksSorterFullSort::update(RuntimeState* state, const ChunkPtr& chunk) 
         return Status::InternalError("Full sort in single query instance only support at most 4294967295 rows");
     }
 
-    _big_chunk->append(*chunk);
+    _big_chunk->append(*chunk);//你要是这么说的话，那chunk岂不是没有固定的大小？
 
     DCHECK(!_big_chunk->has_const_column());
     return Status::OK();
@@ -363,7 +363,7 @@ Status ChunksSorterFullSort::_sort_chunks(RuntimeState* state) {
 Status ChunksSorterFullSort::_build_sorting_data(RuntimeState* state) {
     SCOPED_TIMER(_build_timer);
     size_t row_count = _big_chunk->num_rows();
-
+    //抽离下expr中的column
     _sorted_segment = std::make_unique<DataSegment>(_sort_exprs, ChunkPtr(_big_chunk.release()));
 
     _sorted_permutation.resize(row_count);
@@ -389,13 +389,13 @@ Status ChunksSorterFullSort::_sort_by_row_cmp(RuntimeState* state) {
     const size_t elem_number = _sorted_permutation.size();
     std::vector<size_t> indices(elem_number);
     for (size_t i = 0; i < elem_number; ++i) {
-        indices[i] = i;
+        indices[i] = i;//这里临时弄了个更小的
     }
 
     const DataSegment& data_segment = *_sorted_segment;
     const std::vector<int>& sort_order_flag = _sort_order_flag;
     const std::vector<int>& null_first_flag = _null_first_flag;
-
+    //这里是关键了，比较2个索引值。
     auto cmp_fn = [&data_segment, &sort_order_flag, &null_first_flag](const size_t& l, const size_t& r) {
         int c = data_segment.compare_at(l, data_segment, r, sort_order_flag, null_first_flag);
         if (c == 0) {
@@ -405,7 +405,7 @@ Status ChunksSorterFullSort::_sort_by_row_cmp(RuntimeState* state) {
         }
     };
 
-    pdqsort(state->cancelled_ref(), indices.begin(), indices.end(), cmp_fn);
+    pdqsort(state->cancelled_ref(), indices.begin(), indices.end(), cmp_fn);//所以你看这依然是个全内存的排序
     RETURN_IF_CANCELLED(state);
 
     // Set the permutation array to sorted indices.

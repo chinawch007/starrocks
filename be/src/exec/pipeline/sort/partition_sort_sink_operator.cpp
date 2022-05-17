@@ -42,7 +42,7 @@ Status PartitionSortSinkOperator::push_chunk(RuntimeState* state, const vectoriz
 }
 
 void PartitionSortSinkOperator::set_finishing(RuntimeState* state) {
-    _chunks_sorter->finish(state);
+    _chunks_sorter->finish(state);//另一边实际就调用了done
 
     // Current partition sort is ended, and
     // the last call will drive LocalMergeSortSourceOperator to work.

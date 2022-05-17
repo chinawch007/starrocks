@@ -19,7 +19,7 @@ namespace vectorized {
 
 class DatumTuple;
 
-class Chunk {
+class Chunk {//体积是否固定？
 public:
     using ChunkPtr = std::shared_ptr<Chunk>;
     using SlotHashMap = phmap::flat_hash_map<SlotId, size_t, StdHash<SlotId>>;
@@ -48,7 +48,7 @@ public:
     bool has_columns() const { return !_columns.empty(); }
     bool has_tuple_columns() const { return !_tuple_id_to_index.empty(); }
     size_t num_columns() const { return _columns.size(); }
-    size_t num_rows() const { return _columns.empty() ? 0 : _columns[0]->size(); }
+    size_t num_rows() const { return _columns.empty() ? 0 : _columns[0]->size(); }//每类的行数都一样。
     size_t num_tuple_columns() const { return _tuple_id_to_index.size(); }
 
     // Resize the chunk to contain |count| rows elements.
@@ -129,7 +129,7 @@ public:
     void merge(Chunk&& src);
 
     // Append |count| rows from |src|, started from |offset|, to the |this| chunk.
-    void append(const Chunk& src, size_t offset, size_t count);
+    void append(const Chunk& src, size_t offset, size_t count);//所以后边这俩是特定范围的行
 
     // columns in chunk may have same column ptr
     // append_safe will check size of all columns in dest chunk
@@ -149,7 +149,7 @@ public:
     //      input indexes: [5, 4, 3, 2, 1]
     //      from: 2
     //      size: 2
-    // This function will copy the [3, 2] row of src to this chunk.
+    // This function will copy the [3, 2] row of src to this chunk.这有个直接拷贝chunk的，那就不用列的那个了。。。
     void append_selective(const Chunk& src, const uint32_t* indexes, uint32_t from, uint32_t size);
 
     // This function will append data from src according to the input indexes.
@@ -239,11 +239,11 @@ private:
     void rebuild_cid_index();
 
     Columns _columns;
-    std::shared_ptr<Schema> _schema;
+    std::shared_ptr<Schema> _schema;//这又是啥？
     ColumnIdHashMap _cid_to_index;
     // For compatibility
-    SlotHashMap _slot_id_to_index;
-    TupleHashMap _tuple_id_to_index;
+    SlotHashMap _slot_id_to_index;//slot什么用
+    TupleHashMap _tuple_id_to_index;//tuple是什么？
     DelCondSatisfied _delete_state = DEL_NOT_SATISFIED;
 };
 

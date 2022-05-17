@@ -99,7 +99,7 @@ public:
     virtual Status get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos);
 
     // Used by sub nodes to get big chunk.
-    // specific_get_next is the subclass's implementation to get datas.
+    // specific_get_next is the subclass's implementation to get datas.//拿什么的？
     static Status get_next_big_chunk(RuntimeState*, ChunkPtr*, bool*, ChunkPtr& pre_output_chunk,
                                      const std::function<Status(RuntimeState*, ChunkPtr*, bool*)>& specific_get_next);
 
@@ -148,7 +148,7 @@ public:
     // Collect all scan node types.
     void collect_scan_nodes(std::vector<ExecNode*>* nodes);
 
-    // evaluate exprs over chunk to get a filter
+    // evaluate exprs over chunk to get a filter//这里说的非常好，获取一个filter，evaluate的具体中文含义恐怕难以言明
     // if filter_ptr is not null, save filter to filter_ptr.
     // then running filter on chunk.
     static void eval_conjuncts(const std::vector<ExprContext*>& ctxs, vectorized::Chunk* chunk,
@@ -242,7 +242,7 @@ protected:
     std::set<TPlanNodeId> _local_rf_waiting_set;
 
     std::vector<ExecNode*> _children;
-    RowDescriptor _row_descriptor;
+    RowDescriptor _row_descriptor;//这里也是外边传进来的，看看具体哪来的？
 
     /// Resource information sent from the frontend.
     const TBackendResourceProfile _resource_profile;
@@ -271,7 +271,7 @@ protected:
     // It is used for pipeline to rewrite runtime in filters.
     std::vector<TupleSlotMapping> _tuple_slot_mappings;
 
-    ExecNode* child(int i) { return _children[i]; }
+    ExecNode* child(int i) { return _children[i]; }//从这看出来是个树形结构
 
     bool is_closed() const { return _is_closed; }
 

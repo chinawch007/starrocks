@@ -24,7 +24,7 @@ public:
     OpFactories maybe_interpolate_local_broadcast_exchange(RuntimeState* state, OpFactories& pred_operators,
                                                            int num_receivers);
 
-    // Input the output chunks from the drivers of pred operators into ONE driver of the post operators.
+    // Input the output chunks from the drivers of pred operators into ONE driver of the post operators.//函数功能怎么体现的这部分注释呢
     OpFactories maybe_interpolate_local_passthrough_exchange(RuntimeState* state, OpFactories& pred_operators);
     OpFactories maybe_interpolate_local_passthrough_exchange(RuntimeState* state, OpFactories& pred_operators,
                                                              int num_receivers);

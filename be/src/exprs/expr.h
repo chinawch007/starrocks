@@ -50,7 +50,7 @@ class Expr;
 class ObjectPool;
 class RuntimeState;
 class TColumnValue;
-class TExpr;
+class TExpr;//跟这个类的关系
 class TExprNode;
 class Literal;
 class UserFunctionCacheEntry;
@@ -64,7 +64,7 @@ class ColumnPredicateRewriter;
 using vectorized::ColumnPtr;
 
 // This is the superclass of all expr evaluation nodes.
-class Expr {
+class Expr {//看看成员函数的描述，稍微了解下这个类的作用？
 public:
     // Empty virtual destructor
     virtual ~Expr();
@@ -92,7 +92,7 @@ public:
     // TODO: this will be unnecessary once we support the DECIMAL(precision, scale) type
     int output_scale() const { return _output_scale; }
 
-    void add_child(Expr* expr) { _children.push_back(expr); }
+    void add_child(Expr* expr) { _children.push_back(expr); }//有层次关系
     Expr* get_child(int i) const { return _children[i]; }
     int get_num_children() const { return _children.size(); }
 
@@ -111,7 +111,7 @@ public:
 
     bool is_monotonic() const { return _is_monotonic; }
 
-    // In most time, this field is passed from FE
+    // In most time, this field is passed from FE//似乎fe那边有个替身类
     // Sometimes we want to construct expr on BE implicitly and we have knowledge about `monotonicity`
     void set_monotonic(bool v) { _is_monotonic = v; }
 
@@ -149,10 +149,10 @@ public:
     /// Creates an expr tree for the node rooted at 'node_idx' via depth-first traversal.
     /// parameters
     ///   nodes: vector of thrift expression nodes to be translated
-    ///   parent: parent of node at node_idx (or NULL for node_idx == 0)
+    ///   parent: parent of node at node_idx (or NULL for node_idx == 0)//递归的吗？编号是整棵树内而不是全局的？
     ///   node_idx:
-    ///     in: root of TExprNode tree
-    ///     out: next node in 'nodes' that isn't part of tree
+    ///     in: root of TExprNode tree//从这里看他这个node还有个编号？
+    ///     out: next node in 'nodes' that isn't part of tree//这套路深啊。。。
     ///   root_expr: out: root of constructed expr tree
     ///   ctx: out: context of constructed expr tree
     /// return
@@ -266,7 +266,7 @@ protected:
     int _output_scale;
 
     /// Function description.
-    TFunction _fn;
+    TFunction _fn;//干啥的呢？
 
     /// Index to pass to ExprContext::fn_context() to retrieve this expr's FunctionContext.
     /// Set in RegisterFunctionContext(). -1 if this expr does not need a FunctionContext and

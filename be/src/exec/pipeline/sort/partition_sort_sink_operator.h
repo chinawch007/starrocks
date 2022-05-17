@@ -37,7 +37,7 @@ public:
                               const RowDescriptor& parent_node_row_desc,
                               const RowDescriptor& parent_node_child_row_desc, SortContext* sort_context)
             : Operator(factory, id, "partition_sort_sink", plan_node_id),
-              _chunks_sorter(std::move(chunks_sorter)),
+              _chunks_sorter(std::move(chunks_sorter)),//这里是指定了一个排序类
               _sort_exec_exprs(std::move(sort_exec_exprs)),
               _order_by_types(order_by_types),
               _materialized_tuple_desc(materialized_tuple_desc),

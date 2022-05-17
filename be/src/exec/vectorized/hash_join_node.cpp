@@ -28,7 +28,7 @@
 
 namespace starrocks::vectorized {
 
-HashJoinNode::HashJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
+HashJoinNode::HashJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)//这里是是在执行器阶段被构造，下边是实际init
         : ExecNode(pool, tnode, descs),
           _hash_join_node(tnode.hash_join_node),
           _join_type(tnode.hash_join_node.join_op) {
@@ -55,13 +55,14 @@ Status HashJoinNode::init(const TPlanNode& tnode, RuntimeState* state) {
         _runtime_profile->add_info_string("Predicates", tnode.hash_join_node.sql_predicates);
     }
 
+    //这里我看来都没有看过
     const std::vector<TEqJoinCondition>& eq_join_conjuncts = tnode.hash_join_node.eq_join_conjuncts;
     for (const auto& eq_join_conjunct : eq_join_conjuncts) {
         ExprContext* ctx = nullptr;
         RETURN_IF_ERROR(Expr::create_expr_tree(_pool, eq_join_conjunct.left, &ctx));
         _probe_expr_ctxs.push_back(ctx);
-        RETURN_IF_ERROR(Expr::create_expr_tree(_pool, eq_join_conjunct.right, &ctx));
-        _build_expr_ctxs.push_back(ctx);
+        RETURN_IF_ERROR(Expr::create_expr_tree(_pool, eq_join_conjunct.right, &ctx));//这里确实明确标示了右侧
+        _build_expr_ctxs.push_back(ctx);//可以认为是等值表达式右端.
 
         if (eq_join_conjunct.__isset.opcode && eq_join_conjunct.opcode == TExprOpcode::EQ_FOR_NULL) {
             _is_null_safes.emplace_back(true);
@@ -70,7 +71,7 @@ Status HashJoinNode::init(const TPlanNode& tnode, RuntimeState* state) {
         }
     }
 
-    if (tnode.hash_join_node.__isset.partition_exprs) {
+    if (tnode.hash_join_node.__isset.partition_exprs) {//按表达式分区？
         for (const auto& partition_expr : tnode.hash_join_node.partition_exprs) {
             for (auto i = 0; i < eq_join_conjuncts.size(); ++i) {
                 const auto& eq_join_conjunct = eq_join_conjuncts[i];
@@ -96,10 +97,10 @@ Status HashJoinNode::init(const TPlanNode& tnode, RuntimeState* state) {
     }
 
     if (tnode.__isset.need_create_tuple_columns) {
-        _need_create_tuple_columns = tnode.need_create_tuple_columns;
+        _need_create_tuple_columns = tnode.need_create_tuple_columns;//不清楚具体作用，在下边是给hash表初始化当参数的
     }
 
-    if (tnode.hash_join_node.__isset.output_columns) {
+    if (tnode.hash_join_node.__isset.output_columns) {//看下这个输出是怎么搞的
         _output_slots.insert(tnode.hash_join_node.output_columns.begin(), tnode.hash_join_node.output_columns.end());
     }
     return Status::OK();
@@ -185,30 +186,30 @@ Status HashJoinNode::open(RuntimeState* state) {
     RETURN_IF_CANCELLED(state);
 
     RETURN_IF_ERROR(ExecNode::open(state));
-    RETURN_IF_ERROR(Expr::open(_build_expr_ctxs, state));
+    RETURN_IF_ERROR(Expr::open(_build_expr_ctxs, state));//什么意涵？
     RETURN_IF_ERROR(Expr::open(_probe_expr_ctxs, state));
     RETURN_IF_ERROR(Expr::open(_other_join_conjunct_ctxs, state));
 
     {
         build_timer.stop();
-        RETURN_IF_ERROR(child(1)->open(state));
+        RETURN_IF_ERROR(child(1)->open(state));//这里看来是右表
         build_timer.start();
     }
 
-    while (true) {
+    while (true) {//这个无限循环的目的是什么？
         ChunkPtr chunk = nullptr;
         bool eos = false;
         {
             RETURN_IF_CANCELLED(state);
             // fetch chunk of right table
             build_timer.stop();
-            RETURN_IF_ERROR(child(1)->get_next(state, &chunk, &eos));
+            RETURN_IF_ERROR(child(1)->get_next(state, &chunk, &eos));//这里的目的是为了把所有的数据囤积起来,
             build_timer.start();
             if (eos) {
                 break;
             }
 
-            if (chunk->num_rows() <= 0) {
+            if (chunk->num_rows() <= 0) {//这种情况难道并不表示没拿到数据吗？
                 continue;
             }
         }
@@ -381,16 +382,17 @@ Status HashJoinNode::close(RuntimeState* state) {
     return ExecNode::close(state);
 }
 
+//这里只被调用了一次？多条pipleline的拓展是是在哪里做的。
 pipeline::OpFactories HashJoinNode::decompose_to_pipeline(pipeline::PipelineBuilderContext* context) {
     using namespace pipeline;
-    auto rhs_operators = child(1)->decompose_to_pipeline(context);
+    auto rhs_operators = child(1)->decompose_to_pipeline(context);//递归，返回的是opFac
     auto lhs_operators = child(0)->decompose_to_pipeline(context);
     size_t num_right_partitions;
     size_t num_left_partitions;
-    if (_distribution_mode == TJoinDistributionMode::BROADCAST) {
+    if (_distribution_mode == TJoinDistributionMode::BROADCAST) {//为什么都需要加passthrough呢？
         num_right_partitions = 1;
         // Broadcast join need only create one hash table, because all the HashJoinProbeOperators
-        // use the same hash table with their own different probe states.
+        // use the same hash table with their own different probe states.//不然你要建几个哈希表
         rhs_operators = context->maybe_interpolate_local_passthrough_exchange(runtime_state(), rhs_operators);
 
         num_left_partitions = context->degree_of_parallelism();
@@ -400,7 +402,7 @@ pipeline::OpFactories HashJoinNode::decompose_to_pipeline(pipeline::PipelineBuil
         // "col NOT IN (NULL, val1, val2)" always returns false, so hash join should
         // return empty result in this case. Hash join cannot be divided into multiple
         // partitions in this case. Otherwise, NULL value in right table will only occur
-        // in some partition hash table, and other partition hash table can output chunk.
+        // in some partition hash table, and other partition hash table can output chunk.//这部分对于空值的讨论不太理解。
         if (_join_type == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
             num_left_partitions = num_right_partitions = 1;
 
@@ -425,10 +427,10 @@ pipeline::OpFactories HashJoinNode::decompose_to_pipeline(pipeline::PipelineBuil
                 if (texchange_node.partition_type == TPartitionType::HASH_PARTITIONED ||
                     texchange_node.partition_type == TPartitionType::BUCKET_SHFFULE_HASH_PARTITIONED) {
                     part_type = texchange_node.partition_type;
-                    rhs_need_local_shuffle = false;
+                    rhs_need_local_shuffle = false;//属于上述分区类别，不用shuffle
                 }
             }
-            bool lhs_need_local_shuffle = true;
+            bool lhs_need_local_shuffle = true;//左右表应该是同样的shuffle方式。
             if (auto* exchange_op = dynamic_cast<ExchangeSourceOperatorFactory*>(lhs_operators[0].get());
                 exchange_op != nullptr) {
                 auto& texchange_node = exchange_op->texchange_node();
@@ -464,12 +466,13 @@ pipeline::OpFactories HashJoinNode::decompose_to_pipeline(pipeline::PipelineBuil
         }
     }
 
+    //rowdesc传下去做参数了。如果_row_descriptor就是我自己的输出结果，那么没必要考虑两个孩子，mj的输出结果直接就用_row_descriptor类型构建就行了。
     auto* pool = context->fragment_context()->runtime_state()->obj_pool();
     HashJoinerParam param(pool, _hash_join_node, _id, _type, _is_null_safes, _build_expr_ctxs, _probe_expr_ctxs,
-                          _other_join_conjunct_ctxs, _conjunct_ctxs, child(1)->row_desc(), child(0)->row_desc(),
+                          _other_join_conjunct_ctxs, _conjunct_ctxs, child(1)->row_desc(), child(0)->row_desc(),//好的，这里就是ht中两边列组合的根源，都是外部固定传进来的，没法改变。
                           _row_descriptor, child(1)->type(), child(0)->type(), child(1)->conjunct_ctxs().empty(),
                           _build_runtime_filters, _output_slots, _distribution_mode);
-    auto hash_joiner_factory = std::make_shared<starrocks::pipeline::HashJoinerFactory>(param, num_left_partitions);
+    auto hash_joiner_factory = std::make_shared<starrocks::pipeline::HashJoinerFactory>(param, num_left_partitions);//左表要建几个prober
 
     // add placeholder into RuntimeFilterHub, HashJoinBuildOperator will generate runtime filters and fill it,
     // Operators consuming the runtime filters will inspect this placeholder.
@@ -482,7 +485,7 @@ pipeline::OpFactories HashJoinNode::decompose_to_pipeline(pipeline::PipelineBuil
     std::unique_ptr<PartialRuntimeFilterMerger> partial_rf_merger = std::make_unique<PartialRuntimeFilterMerger>(
             pool, _runtime_join_filter_pushdown_limit * num_right_partitions, num_right_partitions);
 
-    auto build_op = std::make_shared<HashJoinBuildOperatorFactory>(
+    auto build_op = std::make_shared<HashJoinBuildOperatorFactory>(//这里创建builder，下边创建builder和prober
             context->next_operator_id(), id(), hash_joiner_factory, std::move(partial_rf_merger), _distribution_mode);
 
     // Initialize OperatorFactory's fields involving runtime filters.
@@ -495,7 +498,7 @@ pipeline::OpFactories HashJoinNode::decompose_to_pipeline(pipeline::PipelineBuil
     this->init_runtime_filter_for_operator(probe_op.get(), context, rc_rf_probe_collector);
 
     // add build-side pipeline to context and return probe-side pipeline.
-    rhs_operators.emplace_back(std::move(build_op));
+    rhs_operators.emplace_back(std::move(build_op));//这里看出来就是开始构建完整pipeline了。
     context->add_pipeline(rhs_operators);
 
     lhs_operators.emplace_back(std::move(probe_op));
@@ -516,7 +519,7 @@ bool HashJoinNode::_has_null(const ColumnPtr& column) {
     return false;
 }
 
-Status HashJoinNode::_build(RuntimeState* state) {
+Status HashJoinNode::_build(RuntimeState* state) {//mj不需要这个
     {
         SCOPED_TIMER(_build_conjunct_evaluate_timer);
         // Currently, in order to implement simplicity, HashJoinNode uses BigChunk,

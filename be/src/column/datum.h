@@ -31,7 +31,7 @@ typedef unsigned __int128 uint128_t;
 class Datum;
 using DatumArray = std::vector<Datum>;
 
-class Datum {
+class Datum {//mj，你只能get特定类型的话，我怎么才能判等呢？
 public:
     Datum() = default;
 

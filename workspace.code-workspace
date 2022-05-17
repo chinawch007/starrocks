@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "be"
+		},
+		{
+			"path": "gensrc/thrift"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.tpp": "cpp"
+		}
+	}
+}

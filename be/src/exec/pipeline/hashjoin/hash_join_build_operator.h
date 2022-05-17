@@ -48,7 +48,7 @@ public:
 private:
     HashJoinerPtr _join_builder;
     // Assign the readable hash table from _join_builder to each only probe hash_joiner,
-    // when _join_builder finish building the hash tbale.
+    // when _join_builder finish building the hash tbale.//这些joiner的ht都是builder的？
     const std::vector<HashJoinerPtr>& _read_only_join_probers;
     size_t _driver_sequence;
     PartialRuntimeFilterMerger* _partial_rf_merger;

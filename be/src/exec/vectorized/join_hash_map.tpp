@@ -17,8 +17,8 @@ const Buffer<typename JoinBuildFunc<PT>::CppType>& JoinBuildFunc<PT>::get_key_da
         auto* null_column = ColumnHelper::as_raw_column<NullableColumn>(table_items.key_columns[0]);
         return ColumnHelper::as_raw_column<ColumnType>(null_column->data_column())->get_data();
     }
-
-    return ColumnHelper::as_raw_column<ColumnType>(table_items.key_columns[0])->get_data();
+    //其他ht类型，肯定提取数据的方法会有不同，我的mj也需要类似地用不同的手段来应对这些情况吗？
+    return ColumnHelper::as_raw_column<ColumnType>(table_items.key_columns[0])->get_data();//所以这里是真正提取类型的地方
 }
 
 template <PrimitiveType PT>
@@ -384,7 +384,7 @@ void JoinHashMap<PT, BuildFunc, ProbeFunc>::probe(RuntimeState* state, const Col
     _probe_state->key_columns = &key_columns;
     {
         SCOPED_TIMER(_probe_state->search_ht_timer);
-        _search_ht(state, probe_chunk);
+        _search_ht(state, probe_chunk);//这里是对probe_chunk做了些标记，记录了哪些行被关联了吗？
         if (_probe_state->count <= 0) {
             *has_remain = false;
             return;
@@ -448,7 +448,7 @@ void JoinHashMap<PT, BuildFunc, ProbeFunc>::probe(RuntimeState* state, const Col
         }
         {
             SCOPED_TIMER(_table_items->output_build_column_timer);
-            _build_output(chunk);
+            _build_output(chunk);//等于这个chunk是被左右表各处理一次。
         }
         {
             SCOPED_TIMER(_probe_state->output_tuple_column_timer);
@@ -497,16 +497,16 @@ void JoinHashMap<PT, BuildFunc, ProbeFunc>::_probe_output(ChunkPtr* probe_chunk,
     bool to_nullable = _table_items->left_to_nullable;
 
     for (size_t i = 0; i < _table_items->probe_column_count; i++) {
-        HashTableSlotDescriptor hash_table_slot = _table_items->probe_slots[i];
-        SlotDescriptor* slot = hash_table_slot.slot;
+        HashTableSlotDescriptor hash_table_slot = _table_items->probe_slots[i];//这里存的其实是probe块的列结构，
+        SlotDescriptor* slot = hash_table_slot.slot;//传进来的tupledesc哪去了？
         auto& column = (*probe_chunk)->get_column_by_slot_id(slot->id());
-        if (hash_table_slot.need_output) {
+        if (hash_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             if (!column->is_nullable()) {
                 _copy_probe_column(&column, chunk, slot, to_nullable);
             } else {
                 _copy_probe_nullable_column(&column, chunk, slot);
             }
-        } else {
+        } else {//下边没有select的步骤，看起来是个空列
             ColumnPtr default_column = ColumnHelper::create_column(slot->type(), column->is_nullable() || to_nullable);
             default_column->append_default(_probe_state->count);
             (*chunk)->append_column(std::move(default_column), slot->id());
@@ -561,10 +561,10 @@ template <PrimitiveType PT, class BuildFunc, class ProbeFunc>
 void JoinHashMap<PT, BuildFunc, ProbeFunc>::_build_output(ChunkPtr* chunk) {
     bool to_nullable = _table_items->right_to_nullable;
     for (size_t i = 0; i < _table_items->build_column_count; i++) {
-        HashTableSlotDescriptor hash_table_slot = _table_items->build_slots[i];
-        SlotDescriptor* slot = hash_table_slot.slot;
-        ColumnPtr& column = _table_items->build_chunk->columns()[i];
-        if (hash_table_slot.need_output) {
+        HashTableSlotDescriptor hash_table_slot = _table_items->build_slots[i];//列的索引，在slot中？
+        SlotDescriptor* slot = hash_table_slot.slot;//他这个slot，跟列又是一种什么样的关系呢？
+        ColumnPtr& column = _table_items->build_chunk->columns()[i];//从这里看这个column是有数据的。
+        if (hash_table_slot.need_output) {//与去重有关吗？
             if (!column->is_nullable()) {
                 _copy_build_column(column, chunk, slot, to_nullable);
             } else {
@@ -636,7 +636,7 @@ void JoinHashMap<PT, BuildFunc, ProbeFunc>::_build_default_output(ChunkPtr* chun
     }
 }
 
-template <PrimitiveType PT, class BuildFunc, class ProbeFunc>
+template <PrimitiveType PT, class BuildFunc, class ProbeFunc>//重复列咋搞
 void JoinHashMap<PT, BuildFunc, ProbeFunc>::_copy_probe_column(ColumnPtr* src_column, ChunkPtr* chunk,
                                                                const SlotDescriptor* slot, bool to_nullable) {
     if (_probe_state->match_flag == JoinMatchFlag::ALL_MATCH_ONE) {
@@ -677,7 +677,7 @@ void JoinHashMap<PT, BuildFunc, ProbeFunc>::_copy_probe_nullable_column(ColumnPt
     }
 }
 
-template <PrimitiveType PT, class BuildFunc, class ProbeFunc>
+template <PrimitiveType PT, class BuildFunc, class ProbeFunc>//从源列中选出一些行，加到目标chunk中去。
 void JoinHashMap<PT, BuildFunc, ProbeFunc>::_copy_build_column(const ColumnPtr& src_column, ChunkPtr* chunk,
                                                                const SlotDescriptor* slot, bool to_nullable) {
     ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), to_nullable);
@@ -697,10 +697,10 @@ void JoinHashMap<PT, BuildFunc, ProbeFunc>::_copy_build_column(const ColumnPtr& 
             }
         }
     } else {
-        dest_column->append_selective(*src_column, _probe_state->build_index.data(), 0, _probe_state->count);
+        dest_column->append_selective(*src_column, _probe_state->build_index.data(), 0, _probe_state->count);//ok，索引在另一个结构里.
     }
 
-    (*chunk)->append_column(std::move(dest_column), slot->id());
+    (*chunk)->append_column(std::move(dest_column), slot->id());//这是加一整列吗？就是说我不能一行一行加，得是一列一列加
 }
 
 template <PrimitiveType PT, class BuildFunc, class ProbeFunc>

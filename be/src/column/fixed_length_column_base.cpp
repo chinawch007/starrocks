@@ -76,7 +76,7 @@ int FixedLengthColumnBase<T>::compare_at(size_t left, size_t right, const Column
         } else {
             return v > 0 ? 1 : -1;
         }
-    } else {
+    } else {//就是日期时间数值这3种呗？
         // uint8/int8_t, uint16/int16_t, uint32/int32_t, int64, int128, float, double, Decimal, ...
         if (x > y) {
             return 1;

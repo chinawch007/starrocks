@@ -267,8 +267,8 @@ void JoinHashTable::create(const HashTableParam& param) {
     _probe_state->output_probe_column_timer = param.output_probe_column_timer;
     _probe_state->output_tuple_column_timer = param.output_tuple_column_timer;
 
-    const auto& probe_desc = *param.probe_row_desc;
-    for (const auto& tuple_desc : probe_desc.tuple_descriptors()) {
+    const auto& probe_desc = *param.probe_row_desc;//就是说左右子rowdesc跟我啥关系？
+    for (const auto& tuple_desc : probe_desc.tuple_descriptors()) {//这里是遍历了row_desc中所有的slot
         for (const auto& slot : tuple_desc->slots()) {
             HashTableSlotDescriptor hash_table_slot;
             hash_table_slot.slot = slot;
@@ -282,7 +282,7 @@ void JoinHashTable::create(const HashTableParam& param) {
                 hash_table_slot.need_output = false;
             }
 
-            _table_items->probe_slots.emplace_back(hash_table_slot);
+            _table_items->probe_slots.emplace_back(hash_table_slot);//这里是把所有tuple的slot都混在一起了，又得具体了解两者的含义了。
             _table_items->probe_column_count++;
         }
         if (_table_items->row_desc->get_tuple_idx(tuple_desc->id()) != RowDescriptor::INVALID_IDX) {
@@ -290,7 +290,7 @@ void JoinHashTable::create(const HashTableParam& param) {
         }
     }
 
-    const auto& build_desc = *param.build_row_desc;
+    const auto& build_desc = *param.build_row_desc;//看看这个row_desc最终是从哪来的？
     for (const auto& tuple_desc : build_desc.tuple_descriptors()) {
         for (const auto& slot : tuple_desc->slots()) {
             HashTableSlotDescriptor hash_table_slot;
@@ -312,7 +312,7 @@ void JoinHashTable::create(const HashTableParam& param) {
                 nullable_column->append_default_not_null_value();
             } else {
                 column->append_default();
-            }
+            }//这里是build_chunk的内容生成，比上边probe多了这个内容，这里是没有实际数据的，空列？
             _table_items->build_chunk->append_column(std::move(column), slot->id());
             _table_items->build_column_count++;
         }
@@ -426,7 +426,7 @@ void JoinHashTable::append_chunk(RuntimeState* state, const ChunkPtr& chunk) {
                     ColumnPtr& src_column = chunk->get_tuple_column_by_id(iter->first);
                     ColumnPtr dest_column = BooleanColumn::create(_table_items->row_count + 1, 1);
                     dest_column->append(*src_column, 0, src_column->size());
-                    _table_items->build_chunk->append_tuple_column(dest_column, iter->first);
+                    _table_items->build_chunk->append_tuple_column(dest_column, iter->first);//这里是又加了些东西吗？
                     chunk_memory_size += src_column->memory_usage();
                 }
             }

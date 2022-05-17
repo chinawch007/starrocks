@@ -64,7 +64,7 @@ std::vector<std::string> Schema::field_names() const {
 
 FieldPtr Schema::get_field_by_name(const std::string& name) const {
     size_t idx = get_field_index_by_name(name);
-    return idx == -1 ? nullptr : _fields[idx];
+    return idx == -1 ? nullptr : _fields[idx];//转折对应关系
 }
 
 void Schema::_build_index_map(const Fields& fields) {

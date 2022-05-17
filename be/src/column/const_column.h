@@ -7,11 +7,11 @@
 
 namespace starrocks::vectorized {
 
-class ConstColumn final : public ColumnFactory<Column, ConstColumn> {
+class ConstColumn final : public ColumnFactory<Column, ConstColumn> {//常量列的意思莫非是本列所有的值都一样？
     friend class ColumnFactory<Column, ConstColumn>;
 
 public:
-    explicit ConstColumn(ColumnPtr data_column);
+    explicit ConstColumn(ColumnPtr data_column);//我用一个我自己类型的其他实例来构造？
     ConstColumn(ColumnPtr data_column, size_t size);
 
     ConstColumn(const ConstColumn& rhs) : _data(rhs._data->clone_shared()), _size(rhs._size) {}

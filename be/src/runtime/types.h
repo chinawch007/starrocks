@@ -40,7 +40,7 @@ class TypeInfo;
 // Describes a type. Includes the enum, children types, and any type-specific metadata
 // (e.g. precision and scale for decimals).
 struct TypeDescriptor {
-    PrimitiveType type{INVALID_TYPE};
+    PrimitiveType type{INVALID_TYPE};//还是那个枚举类型，跟那边关联起来了。
     /// Only meaningful for type TYPE_CHAR/TYPE_VARCHAR/TYPE_HLL
     int len{-1};
     static constexpr int MAX_VARCHAR_LENGTH = 1048576;

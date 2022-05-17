@@ -6,7 +6,7 @@
 
 namespace starrocks {
 namespace pipeline {
-
+//看看这个op具体的构建场景吧。
 HashJoinBuildOperator::HashJoinBuildOperator(OperatorFactory* factory, int32_t id, const string& name,
                                              int32_t plan_node_id, HashJoinerPtr join_builder,
                                              const std::vector<HashJoinerPtr>& read_only_join_probers,
@@ -14,7 +14,7 @@ HashJoinBuildOperator::HashJoinBuildOperator(OperatorFactory* factory, int32_t i
                                              const TJoinDistributionMode::type distribution_mode)
         : Operator(factory, id, name, plan_node_id),
           _join_builder(std::move(join_builder)),
-          _read_only_join_probers(read_only_join_probers),
+          _read_only_join_probers(read_only_join_probers),//这个探测是有多个HashJoiner吗？
           _driver_sequence(driver_sequence),
           _partial_rf_merger(partial_rf_merger),
           _distribution_mode(distribution_mode) {}
@@ -23,14 +23,14 @@ Status HashJoinBuildOperator::push_chunk(RuntimeState* state, const vectorized::
     return _join_builder->append_chunk_to_ht(state, chunk);
 }
 
-Status HashJoinBuildOperator::prepare(RuntimeState* state) {
+Status HashJoinBuildOperator::prepare(RuntimeState* state) {//prepare加几个引用计数就可以了？
     RETURN_IF_ERROR(Operator::prepare(state));
 
     _join_builder->ref();
     for (auto& read_only_join_prober : _read_only_join_probers) {
         read_only_join_prober->ref();
     }
-
+    //state从哪传来的
     RETURN_IF_ERROR(_join_builder->prepare_builder(state, _unique_metrics.get()));
 
     return Status::OK();
@@ -50,12 +50,12 @@ StatusOr<vectorized::ChunkPtr> HashJoinBuildOperator::pull_chunk(RuntimeState* s
     return Status::NotSupported(msg);
 }
 
-void HashJoinBuildOperator::set_finishing(RuntimeState* state) {
+void HashJoinBuildOperator::set_finishing(RuntimeState* state) {//父类的含义是不会再用输入了
     _is_finished = true;
-    _join_builder->build_ht(state);
+    _join_builder->build_ht(state);//这里是先吃chunk，再建ht
 
     size_t merger_index = _driver_sequence;
-    // Broadcast Join only has one build operator.
+    // Broadcast Join only has one build operator.要么不是广播要么由广播造成的seq为0
     DCHECK(_distribution_mode != TJoinDistributionMode::BROADCAST || _driver_sequence == 0);
 
     _join_builder->create_runtime_filters(state);
@@ -73,7 +73,7 @@ void HashJoinBuildOperator::set_finishing(RuntimeState* state) {
         auto&& in_filters = _partial_rf_merger->get_total_in_filters();
         auto&& bloom_filters = _partial_rf_merger->get_total_bloom_filters();
 
-        // publish runtime bloom-filters
+        // publish runtime bloom-filters//这两步很重要，暂时没全懂
         state->runtime_filter_port()->publish_runtime_filters(bloom_filters);
         // move runtime filters into RuntimeFilterHub.
         runtime_filter_hub()->set_collector(_plan_node_id, std::make_unique<RuntimeFilterCollector>(
@@ -81,9 +81,9 @@ void HashJoinBuildOperator::set_finishing(RuntimeState* state) {
     }
 
     for (auto& read_only_join_prober : _read_only_join_probers) {
-        read_only_join_prober->reference_hash_table(_join_builder.get());
+        read_only_join_prober->reference_hash_table(_join_builder.get());//是了，在这里把prober所使用的ht挂到了builder身上。
     }
-    _join_builder->enter_probe_phase();
+    _join_builder->enter_probe_phase();//这是把block都吃完了吗？
     for (auto& read_only_join_prober : _read_only_join_probers) {
         read_only_join_prober->enter_probe_phase();
     }
@@ -107,9 +107,9 @@ void HashJoinBuildOperatorFactory::close(RuntimeState* state) {
     _hash_joiner_factory->close(state);
     OperatorFactory::close(state);
 }
-
+//也就是说这个实际上的构建，实在pipeline构建时做的，传入的2参是那里负责分配的。
 OperatorPtr HashJoinBuildOperatorFactory::create(int32_t degree_of_parallelism, int32_t driver_sequence) {
-    return std::make_shared<HashJoinBuildOperator>(this, _id, _name, _plan_node_id,
+    return std::make_shared<HashJoinBuildOperator>(this, _id, _name, _plan_node_id,//这里的调用意思是说创建buildop时readonly已经构建好了
                                                    _hash_joiner_factory->create_builder(driver_sequence),
                                                    _hash_joiner_factory->get_read_only_probers(), driver_sequence,
                                                    _partial_rf_merger.get(), _distribution_mode);

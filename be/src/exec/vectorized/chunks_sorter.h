@@ -11,12 +11,12 @@
 namespace starrocks::vectorized {
 struct PermutationItem {
     uint32_t chunk_index;
-    uint32_t index_in_chunk;
+    uint32_t index_in_chunk;//中间这个是啥意思？
     uint32_t permutation_index;
 };
 using Permutation = std::vector<PermutationItem>;
 
-struct DataSegment {
+struct DataSegment {//看来是专门为排序而准备的数据结构
     ChunkPtr chunk;
     Columns order_by_columns;
 
@@ -293,7 +293,7 @@ public:
 
     virtual void setup_runtime(RuntimeProfile* profile, const std::string& parent_timer);
 
-    // Append a Chunk for sort.
+    // Append a Chunk for sort.//下边3个分别是输入，排序，输出？
     virtual Status update(RuntimeState* state, const ChunkPtr& chunk) = 0;
     // Finish seeding Chunk, and get sorted data with top OFFSET rows have been skipped.
     virtual Status done(RuntimeState* state) = 0;

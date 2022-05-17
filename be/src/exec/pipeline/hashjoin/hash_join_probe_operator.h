@@ -30,7 +30,7 @@ public:
     void set_finishing(RuntimeState* state) override;
     void set_finished(RuntimeState* state) override;
 
-    bool is_ready() const override;
+    bool is_ready() const override;//这是比普通op多出来的一个成员函数
     std::string get_name() const override {
         return strings::Substitute("$0(HashJoiner=$1)", Operator::get_name(), _join_prober.get());
     }
@@ -43,7 +43,7 @@ private:
     // For non-broadcast join, _join_builder is identical to _join_prober.
     // For broadcast join, _join_prober references the hash table owned by _join_builder,
     // so increase the reference number of _join_builder to prevent it closing early.
-    const HashJoinerPtr _join_builder;
+    const HashJoinerPtr _join_builder;//这里说的挺明确，就是广播模式下的特例
     bool _is_finished = false;
 };
 

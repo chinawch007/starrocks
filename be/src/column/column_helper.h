@@ -41,7 +41,7 @@ public:
     /**
      * 1 (not null and is true)
      * 0 (null or is false)
-     * @param col must be a boolean column
+     * @param col must be a boolean column//这句话是什么意思？这个列的类型只能是bool？
      */
     static size_t count_true_with_notnull(const ColumnPtr& col);
 
@@ -293,9 +293,9 @@ public:
         }
 #endif
         for (auto i = start_offset; i < to; ++i) {
-            if (filter[i]) {
+            if (filter[i]) {//这种情况下一个byte一个标志
                 *(data + result_offset) = *(data + i);
-                result_offset++;
+                result_offset++;//这样的话其实是resize了。
             }
         }
 

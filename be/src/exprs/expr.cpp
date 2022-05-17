@@ -233,10 +233,10 @@ Status Expr::create_tree_from_thrift(ObjectPool* pool, const std::vector<TExprNo
     }
     return Status::OK();
 }
-
+//向量化体现在哪？
 Status Expr::create_vectorized_expr(starrocks::ObjectPool* pool, const starrocks::TExprNode& texpr_node,
                                     starrocks::Expr** expr) {
-    switch (texpr_node.node_type) {
+    switch (texpr_node.node_type) {//表达式中节点的类型，该怎么去理解？
     case TExprNodeType::BOOL_LITERAL:
     case TExprNodeType::INT_LITERAL:
     case TExprNodeType::LARGE_INT_LITERAL:

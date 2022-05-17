@@ -62,7 +62,7 @@ void HashJoinProbeOperator::set_finishing(RuntimeState* state) {
 
 void HashJoinProbeOperator::set_finished(RuntimeState* state) {
     _join_prober->enter_eos_phase();
-    _join_builder->set_prober_finished();
+    _join_builder->set_prober_finished();//从这里具体看两个joiner的情况
 }
 
 bool HashJoinProbeOperator::is_ready() const {
@@ -81,7 +81,7 @@ void HashJoinProbeOperatorFactory::close(RuntimeState* state) {
 }
 
 OperatorPtr HashJoinProbeOperatorFactory::create(int32_t degree_of_parallelism, int32_t driver_sequence) {
-    return std::make_shared<HashJoinProbeOperator>(this, _id, _name, _plan_node_id,
+    return std::make_shared<HashJoinProbeOperator>(this, _id, _name, _plan_node_id,//传同一个seq，用的不就是同一个joiner吗？
                                                    _hash_joiner_factory->create_prober(driver_sequence),
                                                    _hash_joiner_factory->create_builder(driver_sequence));
 }

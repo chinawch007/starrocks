@@ -12,7 +12,7 @@ namespace pipeline {
 class SortContext;
 
 /*
- * LocalMergeSortSourceOperator is used to merge multiple sorted datas from partion sort sink operator.
+ * LocalMergeSortSourceOperator is used to merge multiple sorted datas from partion sort sink operator.这里说的很明确，作为另一个op的下游
  * It is one instance and Execute in single threaded mode,  
  * It completely depends on SortContext with a heap to Dynamically filter out the smallest or largest data.
  */

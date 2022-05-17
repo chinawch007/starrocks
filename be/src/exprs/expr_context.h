@@ -54,7 +54,7 @@ using vectorized::ColumnPtr;
 /// expression evaluation, as a given tree can be evaluated using multiple ExprContexts
 /// concurrently. A single ExprContext is not thread-safe.
 
-class ExprContext {
+class ExprContext {//看起来是个逻辑表达式，怎么会牵涉到执行中呢？
 public:
     ExprContext(Expr* root);
     ~ExprContext();
@@ -126,7 +126,7 @@ public:
     std::string get_error_msg() const;
 
     // vector query engine
-    ColumnPtr evaluate(vectorized::Chunk* chunk);
+    ColumnPtr evaluate(vectorized::Chunk* chunk);//获取对应列的指针？
 
     ColumnPtr evaluate(Expr* expr, vectorized::Chunk* chunk);
 

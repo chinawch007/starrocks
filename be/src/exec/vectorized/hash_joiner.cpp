@@ -27,7 +27,7 @@ HashJoiner::HashJoiner(const HashJoinerParam& param, const std::vector<HashJoine
           _pool(param._pool),
           _join_type(param._hash_join_node.join_op),
           _is_null_safes(param._is_null_safes),
-          _build_expr_ctxs(param._build_expr_ctxs),
+          _build_expr_ctxs(param._build_expr_ctxs),//这里赋值之后没在用吗？
           _probe_expr_ctxs(param._probe_expr_ctxs),
           _other_join_conjunct_ctxs(param._other_join_conjunct_ctxs),
           _conjunct_ctxs(param._conjunct_ctxs),
@@ -75,8 +75,8 @@ Status HashJoiner::prepare_builder(RuntimeState* state, RuntimeProfile* runtime_
     runtime_profile->add_info_string("JoinType", _get_join_type_str(_join_type));
 
     HashTableParam param;
-    _init_hash_table_param(&param);
-    _ht.create(param);
+    _init_hash_table_param(&param);//所以这里其实还是哈希表自己在用
+    _ht.create(param);//只有builder才创建表
 
     _probe_column_count = _ht.get_probe_column_count();
     _build_column_count = _ht.get_build_column_count();
@@ -108,7 +108,7 @@ void HashJoiner::_init_hash_table_param(HashTableParam* param) {
     param->need_create_tuple_columns = false;
     param->with_other_conjunct = !_other_join_conjunct_ctxs.empty();
     param->join_type = _join_type;
-    param->row_desc = &_row_descriptor;
+    param->row_desc = &_row_descriptor;//这个是啥？
     param->build_row_desc = &_build_row_descriptor;
     param->probe_row_desc = &_probe_row_descriptor;
     param->search_ht_timer = _search_ht_timer;
@@ -147,14 +147,14 @@ Status HashJoiner::append_chunk_to_ht(RuntimeState* state, const ChunkPtr& chunk
     {
         // copy chunk of right table
         SCOPED_TIMER(_copy_right_table_chunk_timer);
-        TRY_CATCH_BAD_ALLOC(_ht.append_chunk(state, chunk));
+        TRY_CATCH_BAD_ALLOC(_ht.append_chunk(state, chunk));//hashtable这里暂时可以作为未知边界。
     }
     return Status::OK();
 }
 
 Status HashJoiner::build_ht(RuntimeState* state) {
     if (_phase == HashJoinPhase::BUILD) {
-        RETURN_IF_ERROR(_build(state));
+        RETURN_IF_ERROR(_build(state));//名字起的太简洁了。。。
         COUNTER_SET(_build_buckets_counter, static_cast<int64_t>(_ht.get_bucket_size()));
     }
 
@@ -198,32 +198,32 @@ StatusOr<ChunkPtr> HashJoiner::pull_chunk(RuntimeState* state) {
     DCHECK(_phase != HashJoinPhase::BUILD);
     return _pull_probe_output_chunk(state);
 }
-
-StatusOr<ChunkPtr> HashJoiner::_pull_probe_output_chunk(RuntimeState* state) {
+//如果是read only的话，
+StatusOr<ChunkPtr> HashJoiner::_pull_probe_output_chunk(RuntimeState* state) {//就是说push时是不探测的额，pull时才探测。
     DCHECK(_phase != HashJoinPhase::BUILD);
 
     auto chunk = std::make_shared<Chunk>();
 
-    if (_phase == HashJoinPhase::PROBE || _probe_input_chunk != nullptr) {
+    if (_phase == HashJoinPhase::PROBE || _probe_input_chunk != nullptr) {//探测阶段就可以向外输出块了
         DCHECK(_ht_has_remain && _probe_input_chunk);
 
-        TRY_CATCH_BAD_ALLOC(_ht.probe(state, _key_columns, &_probe_input_chunk, &chunk, &_ht_has_remain));
+        TRY_CATCH_BAD_ALLOC(_ht.probe(state, _key_columns, &_probe_input_chunk, &chunk, &_ht_has_remain));//也不知道这里输出的块究竟是个什么样的格式
         if (!_ht_has_remain) {
             _probe_input_chunk = nullptr;
         }
 
-        _filter_probe_output_chunk(chunk);
+        _filter_probe_output_chunk(chunk);//从ht拿回来之后，这里必然对chunk内的数据做了修改。
 
         return chunk;
     }
 
     if (_phase == HashJoinPhase::POST_PROBE) {
-        if (!_need_post_probe()) {
+        if (!_need_post_probe()) {//有拉块来驱动阶段变更吗？
             enter_eos_phase();
             return chunk;
         }
 
-        TRY_CATCH_BAD_ALLOC(_ht.probe_remain(state, &chunk, &_ht_has_remain));
+        TRY_CATCH_BAD_ALLOC(_ht.probe_remain(state, &chunk, &_ht_has_remain));//这里是从ht取出来的right anti部分
         if (!_ht_has_remain) {
             enter_eos_phase();
         }
@@ -250,7 +250,7 @@ Status HashJoiner::create_runtime_filters(RuntimeState* state) {
         runtime_join_filter_pushdown_limit = state->query_options().runtime_join_filter_pushdown_limit;
     }
 
-    if (_is_push_down) {
+    if (_is_push_down) {//只有下推的时候才构造in_filter
         if (_probe_node_type == TPlanNodeType::EXCHANGE_NODE && _build_node_type == TPlanNodeType::EXCHANGE_NODE) {
             _is_push_down = false;
         } else if (_ht.get_row_count() > runtime_join_filter_pushdown_limit) {
@@ -279,7 +279,7 @@ void HashJoiner::reference_hash_table(HashJoiner* src_join_builder) {
 }
 
 void HashJoiner::set_builder_finished() {
-    set_finished();
+    set_finished();//下边也有这个，所以build和probe共用一个joiner区分下。
     for (auto& prober : _read_only_join_probers) {
         prober->set_finished();
     }
@@ -287,7 +287,7 @@ void HashJoiner::set_builder_finished() {
 
 void HashJoiner::set_prober_finished() {
     if (--_num_unfinished_probers == 0) {
-        set_finished();
+        set_finished();//注释是说不再有输出了
     }
 }
 
@@ -300,7 +300,7 @@ bool HashJoiner::_has_null(const ColumnPtr& column) {
     return false;
 }
 
-Status HashJoiner::_build(RuntimeState* state) {
+Status HashJoiner::_build(RuntimeState* state) {//hash_node里也有个同名的，这里是建hash表相关，mj不相关。
     {
         SCOPED_TIMER(_build_conjunct_evaluate_timer);
         // Currently, in order to implement simplicity, HashJoiner uses BigChunk,
@@ -324,27 +324,28 @@ Status HashJoiner::_build(RuntimeState* state) {
     return Status::OK();
 }
 
+//我所疑惑的是，A.a>B.b这种形式的，我怎么过滤呢?
 void HashJoiner::_calc_filter_for_other_conjunct(ChunkPtr* chunk, Column::Filter& filter, bool& filter_all,
                                                  bool& hit_all) {
     filter_all = false;
     hit_all = false;
-    filter.assign((*chunk)->num_rows(), 1);
+    filter.assign((*chunk)->num_rows(), 1);//应该就是个bit位集合，0表示干掉，1表示保留
 
-    for (auto* ctx : _other_join_conjunct_ctxs) {
-        ColumnPtr column = ctx->evaluate((*chunk).get());
+    for (auto* ctx : _other_join_conjunct_ctxs) {//对于每个表达式。
+        ColumnPtr column = ctx->evaluate((*chunk).get());//从块中把列解析出来。
         size_t true_count = ColumnHelper::count_true_with_notnull(column);
 
-        if (true_count == column->size()) {
+        if (true_count == column->size()) {//这是全都没过滤 
             // all hit, skip
             continue;
-        } else if (0 == true_count) {
+        } else if (0 == true_count) {//这是全都过滤了
             // all not hit, return
             filter_all = true;
             filter.assign((*chunk)->num_rows(), 0);
             break;
         } else {
             bool all_zero = false;
-            ColumnHelper::merge_two_filters(column, &filter, &all_zero);
+            ColumnHelper::merge_two_filters(column, &filter, &all_zero);//ok，这个columnHelper也成了我的边界了。
             if (all_zero) {
                 filter_all = true;
                 break;
@@ -355,7 +356,7 @@ void HashJoiner::_calc_filter_for_other_conjunct(ChunkPtr* chunk, Column::Filter
     if (!filter_all) {
         int zero_count = SIMD::count_zero(filter.data(), filter.size());
         if (zero_count == 0) {
-            hit_all = true;
+            hit_all = true;//没有0就是全命中，含义显而易见。
         }
     }
 }
@@ -395,10 +396,10 @@ void HashJoiner::_process_outer_join_with_other_conjunct(ChunkPtr* chunk, size_t
     Column::Filter filter;
 
     _calc_filter_for_other_conjunct(chunk, filter, filter_all, hit_all);
-    _process_row_for_other_conjunct(chunk, start_column, column_count, filter_all, hit_all, filter);
+    _process_row_for_other_conjunct(chunk, start_column, column_count, filter_all, hit_all, filter);//专门处理行的，跟上边的区别？
 
     _ht.remove_duplicate_index(&filter);
-    (*chunk)->filter(filter);
+    (*chunk)->filter(filter);//生成一个filter然后去执行它？
 }
 
 void HashJoiner::_process_semi_join_with_other_conjunct(ChunkPtr* chunk) {
@@ -438,7 +439,7 @@ void HashJoiner::_process_other_conjunct(ChunkPtr* chunk) {
         _process_semi_join_with_other_conjunct(chunk);
         break;
     case TJoinOp::RIGHT_ANTI_JOIN:
-        _process_right_anti_join_with_other_conjunct(chunk);
+        _process_right_anti_join_with_other_conjunct(chunk);//filter的话具体哪端在使用，左？右？
         break;
     default:
         // the other join conjunct for inner join will be convert to other predicate
@@ -466,7 +467,7 @@ std::string HashJoiner::_get_join_type_str(TJoinOp::type join_type) {
         return "FullOuterJoin";
     case TJoinOp::CROSS_JOIN:
         return "CrossJoin";
-    case TJoinOp::MERGE_JOIN:
+    case TJoinOp::MERGE_JOIN://?
         return "MergeJoin";
     case TJoinOp::RIGHT_SEMI_JOIN:
         return "RightSemiJoin";
