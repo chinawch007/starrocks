@@ -34,11 +34,6 @@ enum MergeJoinPhase {
     EOS = 4,
 };
 
-struct MergeTableSlotDescriptor {//这部分原来在hash表中的功能，放到joiner中也算是符合原义
-    SlotDescriptor* slot;
-    bool need_output;
-};
-
 struct MergeJoinerParam {//看看具体哪些是用的到的。
     MergeJoinerParam(ObjectPool* pool, const TMergeJoinNode& merge_join_node, TPlanNodeId node_id,
                     const std::vector<ExprContext*>& build_expr_ctxs, const std::vector<ExprContext*>& probe_expr_ctxs,
@@ -98,7 +93,7 @@ public:
             // HashJoinProbeOperator finishes prematurely on runtime error or fragment's cancellation.
             _phase.compare_exchange_strong(old_phase, MergeJoinPhase::EOS);
         }
-        Merge(_result_chunk);//这俩谁先谁后呢？
+        Merge(&_result_chunk);//这俩谁先谁后呢？
     }
     void enter_eos_phase() { 
         _phase = MergeJoinPhase::EOS; 
@@ -106,7 +101,7 @@ public:
     }
     Status append_chunk_to_buffer(RuntimeState* state, const ChunkPtr& chunk);
     //Status sort_buffer(RuntimeState* state);
-    void Merge(ChunkPtr chunk);//you should use the correct way to handle ptr
+    void Merge(ChunkPtr* chunk);//you should use the correct way to handle ptr
 
     void push_chunk(RuntimeState* state, ChunkPtr&& chunk);
     StatusOr<ChunkPtr> pull_chunk(RuntimeState* state);

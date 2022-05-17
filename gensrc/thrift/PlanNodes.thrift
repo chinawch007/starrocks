@@ -400,7 +400,7 @@ struct THashJoinNode {
   50: optional list<RuntimeFilter.TRuntimeFilterDescription> build_runtime_filters;
   51: optional bool build_runtime_filters_from_planner;
 
-  52: optional  distribution_mode;
+  52: optional TJoinDistributionMode distribution_mode;
   53: optional list<Exprs.TExpr> partition_exprs
   54: optional list<Types.TSlotId> output_columns//这里是确定最终的输出列吗？
 }

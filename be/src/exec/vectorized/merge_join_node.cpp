@@ -84,15 +84,15 @@ Status MergeJoinNode::prepare(RuntimeState* state) {
     return Status::OK();
 }
 
-void MergeJoiner::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实话我很奇怪。。。
+void MergeJoiner::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实话我很奇怪。。。你这里还是看起项目里其他函数的用法吧。
     //获取两个chunk关联列中行的引用。
     //有没有能获取列类型的方式，这样我就能从两边chunk遍历列然后判断类型
     //可以用表达式直接从chunk上提取。
     //ColumnPtr column = _expr_ctxs->evaluate((*chunk).get());
-    ColumnPtr left_column = _probe_expr_ctxs->evaluate(*_left_chunk);
-    ColumnPtr right_column = _build_expr_ctxs->evaluate(*_right_chunk);
+    ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//把sptr传给*
+    ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
     int left_pos = 0, right_pos = 0;
-    int left_size = left_column->size(), right_size = right_column->size()
+    int left_size = left_column->size(), right_size = right_column->size();
 
     //
     //using ColumnType = typename RunTimeTypeTraits<PT>::ColumnType;//这里是传参之后
@@ -100,7 +100,7 @@ void MergeJoiner::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实
 
     Buffer<uint32_t> index_left, index_right;
     while(1) {
-        auto res = left_column->compare_at(left_pos, right_pos, right_column, -1);
+        auto res = left_column->compare_at(left_pos, right_pos, *right_column, -1);
         if (res < 0) {
             if(left_pos++ >= left_size)break;
         } else if (res > 0) {
@@ -117,20 +117,20 @@ void MergeJoiner::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实
 
     for (auto merge_table_slot : right_slots) {  
         SlotDescriptor* slot = merge_table_slot.slot;//传进来的tupledesc哪去了？
-        auto& column = (*_right_chunk)->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
+        auto& column = _right_chunk->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
-            dest_column->append_selective(column, index_right, 0, index_right.size());//首参数引用？指针？
+            dest_column->append_selective(*column, index_right.data(), 0, index_right.size());//首参数引用？指针？
             (*chunk)->append_column(std::move(dest_column), slot->id());
         }
     }
 
     for (auto merge_table_slot : left_slots) {  
         SlotDescriptor* slot = merge_table_slot.slot;//传进来的tupledesc哪去了？
-        auto& column = (*_right_chunk)->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
+        auto& column = _left_chunk->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
-            dest_column->append_selective(column, index_left, 0, index_left.size());//首参数引用？指针？
+            dest_column->append_selective(*column, index_left.data(), 0, index_left.size());//首参数引用？指针？
             (*chunk)->append_column(std::move(dest_column), slot->id());
         }
     }
@@ -161,7 +161,7 @@ Status MergeJoinNode::open(RuntimeState* state) {
         }
 
         //这里是要有一个right_chunk来积累上边拿到的chunk
-        _right_chunk->append(chunk);
+        _right_chunk->append(*chunk);
     }
 
     RETURN_IF_ERROR(child(0)->open(state));
@@ -182,10 +182,10 @@ Status MergeJoinNode::open(RuntimeState* state) {
         }
 
         //这里是要有一个left_chunk来积累上边拿到的chunk
-        _left_chunk->append(chunk);
+        _left_chunk->append(*chunk);
     }
     //这里是要做一个对齐操作的。
-    Merge(_result_chunk);
+    Merge(&_result_chunk);
 
     return Status::OK();
 }
@@ -199,9 +199,8 @@ Status MergeJoinNode::get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos) 
     }
 
     //我这里要返回对齐结果后的一定量的row，这个量该怎么确定。刚开始最简单情况，我可以都拉出来，没啥问题。
-
-
-    *chunk = std::make_shared<Chunk>(std::move(_result_chunk));//这里能搞个move吗？
+    *chunk = std::make_shared<Chunk>();
+    (*chunk).swap(_result_chunk);
     _eos = true;//这里自己操作了一下，为了上边的条件，先这么搞，看看具体需不需要吧。
     *eos = false;
     return Status::OK();

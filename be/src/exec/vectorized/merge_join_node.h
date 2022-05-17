@@ -20,6 +20,11 @@ namespace vectorized {
 class ColumnRef;
 class RuntimeFilterBuildDescriptor;
 
+struct MergeTableSlotDescriptor {//joiner也会用，放这里合适吗？
+    SlotDescriptor* slot;
+    bool need_output;
+};
+
 class MergeJoinNode final : public ExecNode {
 
 public:
@@ -36,6 +41,7 @@ public:
     Status get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos) override;
     Status close(RuntimeState* state) override;
     pipeline::OpFactories decompose_to_pipeline(pipeline::PipelineBuilderContext* context) override;
+    void Merge(ChunkPtr* chunk);
 private:
     Status _build(RuntimeState* state);
     Status _probe(RuntimeState* state, ScopedTimer<MonotonicStopWatch>& probe_timer, ChunkPtr* chunk, bool& eos);
@@ -62,9 +68,12 @@ private:
     std::set<SlotId> _output_slots;
     bool _eos = false;
 
+    std::vector<ExprContext*> _probe_equivalence_partition_expr_ctxs;
+    std::vector<ExprContext*> _build_equivalence_partition_expr_ctxs;
+
     Buffer<MergeTableSlotDescriptor> right_slots;
     Buffer<MergeTableSlotDescriptor> left_slots;
-}
+};
 
 
 }
