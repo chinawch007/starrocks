@@ -41,7 +41,7 @@ public:
     Status get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos) override;
     Status close(RuntimeState* state) override;
     pipeline::OpFactories decompose_to_pipeline(pipeline::PipelineBuilderContext* context) override;
-    void Merge(ChunkPtr* chunk);
+    Status Merge(ChunkPtr* chunk);
 private:
     Status _build(RuntimeState* state);
     Status _probe(RuntimeState* state, ScopedTimer<MonotonicStopWatch>& probe_timer, ChunkPtr* chunk, bool& eos);

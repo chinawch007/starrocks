@@ -101,7 +101,7 @@ public:
     }
     Status append_chunk_to_buffer(RuntimeState* state, const ChunkPtr& chunk);
     //Status sort_buffer(RuntimeState* state);
-    void Merge(ChunkPtr* chunk);//you should use the correct way to handle ptr
+    Status Merge(ChunkPtr* chunk);//you should use the correct way to handle ptr
 
     void push_chunk(RuntimeState* state, ChunkPtr&& chunk);
     StatusOr<ChunkPtr> pull_chunk(RuntimeState* state);

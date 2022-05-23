@@ -6,8 +6,8 @@ namespace starrocks {
 namespace pipeline {
 
 MergeJoinProbeOperator::MergeJoinProbeOperator(OperatorFactory* factory, int32_t id, const string& name,
-                                             int32_t plan_node_id, MergeJoinerPtr join_prober)
-        : OperatorWithDependency(factory, id, name, plan_node_id),
+                                             int32_t plan_node_id, int32_t driver_sequence, MergeJoinerPtr join_prober)
+        : OperatorWithDependency(factory, id, name, plan_node_id, driver_sequence),
           _join_prober(std::move(join_prober)) {}
 
 void MergeJoinProbeOperator::close(RuntimeState* state) {
@@ -48,13 +48,15 @@ StatusOr<vectorized::ChunkPtr> MergeJoinProbeOperator::pull_chunk(RuntimeState* 
     return _join_prober->pull_chunk(state);
 }
 
-void MergeJoinProbeOperator::set_finishing(RuntimeState* state) {
+Status MergeJoinProbeOperator::set_finishing(RuntimeState* state) {
     //此处需要进行左右表对齐操作。
     _join_prober->enter_post_probe_phase();
+    return Status::OK();
 }
 
-void MergeJoinProbeOperator::set_finished(RuntimeState* state) {//理论上是has_output拿不到数据之后才调这个的
+Status MergeJoinProbeOperator::set_finished(RuntimeState* state) {//理论上是has_output拿不到数据之后才调这个的
     _join_prober->enter_eos_phase();
+    return Status::OK();
 }
 
 bool MergeJoinProbeOperator::is_ready() const {
@@ -74,7 +76,7 @@ void MergeJoinProbeOperatorFactory::close(RuntimeState* state) {
 
 OperatorPtr MergeJoinProbeOperatorFactory::create(int32_t degree_of_parallelism, int32_t driver_sequence) {
     return std::make_shared<MergeJoinProbeOperator>(this, _id, _name, _plan_node_id,
-                                                   _merge_joiner_factory->create_prober(driver_sequence));
+                                                   driver_sequence, _merge_joiner_factory->create_prober(driver_sequence));
 }
 
 }

@@ -108,12 +108,14 @@ void MergeJoiner::sort_buffer(RuntimeState* state) {
     chunk_sorter.done();
 }
 */
-void MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一个chunk
+Status MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一个chunk
     //获取两个chunk关联列中行的引用。
     //有没有能获取列类型的方式，这样我就能从两边chunk遍历列然后判断类型
     //可以用表达式直接从chunk上提取。
-    ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//这里都是默认一列了，这种写法肯定是有问题的。
-    ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
+    ASSIGN_OR_RETURN(ColumnPtr left_column, _probe_expr_ctxs[0]->evaluate((_left_chunk).get()));
+    ASSIGN_OR_RETURN(ColumnPtr right_column, _build_expr_ctxs[0]->evaluate((_right_chunk).get()));
+    //ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//这里都是默认一列了，这种写法肯定是有问题的。
+    //ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
     int left_pos = 0, right_pos = 0;
     int left_size = left_column->size(), right_size = right_column->size();
 
@@ -144,7 +146,7 @@ void MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一个c
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
             dest_column->append_selective(*column, index_right.data(), 0, index_right.size());//首参数引用？指针？
-            chunk->append_column(std::move(dest_column), slot->id());
+            (*chunk)->append_column(std::move(dest_column), slot->id());
         }
     }
 
@@ -154,7 +156,7 @@ void MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一个c
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
             dest_column->append_selective(*column, index_left.data(), 0, index_left.size());//首参数引用？指针？
-            chunk->append_column(std::move(dest_column), slot->id());
+            (*chunk)->append_column(std::move(dest_column), slot->id());
         }
     }
 
@@ -170,7 +172,7 @@ void MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一个c
     }
     */
 
-    
+    return Status::OK();
 }
 
 void MergeJoiner::push_chunk(RuntimeState* state, ChunkPtr&& chunk) {

@@ -16,7 +16,7 @@ using MergeJoiner = starrocks::vectorized::MergeJoiner;
 class MergeJoinProbeOperator final : public OperatorWithDependency {//跟builder父类不一样。
 public:
     MergeJoinProbeOperator(OperatorFactory* factory, int32_t id, const string& name, int32_t plan_node_id,
-                          MergeJoinerPtr join_prober);
+                          int32_t driver_sequence, MergeJoinerPtr join_prober);
     ~MergeJoinProbeOperator() override = default;
 
     Status prepare(RuntimeState* state) override;
@@ -27,8 +27,8 @@ public:
     bool need_input() const override;
 
     bool is_finished() const override;
-    void set_finishing(RuntimeState* state) override;
-    void set_finished(RuntimeState* state) override;
+    Status set_finishing(RuntimeState* state) override;
+    Status set_finished(RuntimeState* state) override;
 
     bool is_ready() const override;
     std::string get_name() const override {

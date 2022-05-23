@@ -36,7 +36,7 @@ public:
     bool need_input() const override { return !is_finished(); }
 
     //set_finished用父类的函数了
-    void set_finishing(RuntimeState* state) override;
+    Status set_finishing(RuntimeState* state) override;
     //我怀疑这里是轮询，并且是在joiner那边自我finished之后，所以
     bool is_finished() const override { return _join_builder->is_finished(); }
 
@@ -49,7 +49,6 @@ public:
 
 private:
     MergeJoinerPtr _join_builder;
-    size_t _driver_sequence;
 };
 
 //这里的参数肯定是和上边的保持一致的。

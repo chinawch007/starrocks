@@ -9,9 +9,8 @@ namespace pipeline {
 MergeJoinBuildOperator::MergeJoinBuildOperator(OperatorFactory* factory, int32_t id, const string& name,
                                              int32_t plan_node_id, MergeJoinerPtr join_builder,
                                              size_t driver_sequence)
-        : Operator(factory, id, name, plan_node_id),
-          _join_builder(std::move(join_builder)),
-          _driver_sequence(driver_sequence){}
+        : Operator(factory, id, name, plan_node_id, driver_sequence),
+          _join_builder(std::move(join_builder)) {}
 
 Status MergeJoinBuildOperator::push_chunk(RuntimeState* state, const vectorized::ChunkPtr& chunk) {
     return _join_builder->append_chunk_to_buffer(state, chunk);
@@ -40,9 +39,10 @@ StatusOr<vectorized::ChunkPtr> MergeJoinBuildOperator::pull_chunk(RuntimeState* 
 }
 
 //这里其实没有进入finished的一个步骤
-void MergeJoinBuildOperator::set_finishing(RuntimeState* state) {
+Status MergeJoinBuildOperator::set_finishing(RuntimeState* state) {
     //_join_builder->sort_buffer(state);//对所有输入块进行排序，这些块当前估计是内存乱序，我们也要考虑到磁盘上也有的可能。
     _join_builder->enter_probe_phase();//是说build阶段收集排序，probe阶段对齐？
+    return Status::OK();
 }
 
 MergeJoinBuildOperatorFactory::MergeJoinBuildOperatorFactory(//传入一个joiner的factory，是说joiner的构造也由buildop负责？

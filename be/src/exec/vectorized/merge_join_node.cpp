@@ -84,13 +84,15 @@ Status MergeJoinNode::prepare(RuntimeState* state) {
     return Status::OK();
 }
 
-void MergeJoiner::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实话我很奇怪。。。你这里还是看起项目里其他函数的用法吧。
+Status MergeJoinNode::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实话我很奇怪。。。你这里还是看起项目里其他函数的用法吧。
     //获取两个chunk关联列中行的引用。
     //有没有能获取列类型的方式，这样我就能从两边chunk遍历列然后判断类型
     //可以用表达式直接从chunk上提取。
     //ColumnPtr column = _expr_ctxs->evaluate((*chunk).get());
-    ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//把sptr传给*
-    ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
+    ASSIGN_OR_RETURN(ColumnPtr left_column, _probe_expr_ctxs[0]->evaluate((_left_chunk).get()));
+    ASSIGN_OR_RETURN(ColumnPtr right_column, _build_expr_ctxs[0]->evaluate((_right_chunk).get()));
+    //ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//把sptr传给*
+    //ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
     int left_pos = 0, right_pos = 0;
     int left_size = left_column->size(), right_size = right_column->size();
 
@@ -135,6 +137,7 @@ void MergeJoiner::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实
         }
     }
 
+    return Status::OK();
 }
 
 Status MergeJoinNode::open(RuntimeState* state) {
@@ -242,7 +245,7 @@ pipeline::OpFactories MergeJoinNode::decompose_to_pipeline(pipeline::PipelineBui
                 auto& texchange_node = exchange_op->texchange_node();//这个应该就是那个source和sink中间的exchange
                 DCHECK(texchange_node.__isset.partition_type);
                 if (texchange_node.partition_type == TPartitionType::HASH_PARTITIONED ||
-                    texchange_node.partition_type == TPartitionType::BUCKET_SHFFULE_HASH_PARTITIONED) {//就是发送端是分过片，你这里的意思另外的表已经按同样规则分过片了？
+                    texchange_node.partition_type == TPartitionType::BUCKET_SHUFFLE_HASH_PARTITIONED) {//就是发送端是分过片，你这里的意思另外的表已经按同样规则分过片了？
                     part_type = texchange_node.partition_type;
                     rhs_need_local_shuffle = false;//所以这里指的是接收端。
                 }
@@ -253,7 +256,7 @@ pipeline::OpFactories MergeJoinNode::decompose_to_pipeline(pipeline::PipelineBui
                 auto& texchange_node = exchange_op->texchange_node();
                 DCHECK(texchange_node.__isset.partition_type);
                 if (texchange_node.partition_type == TPartitionType::HASH_PARTITIONED ||
-                    texchange_node.partition_type == TPartitionType::BUCKET_SHFFULE_HASH_PARTITIONED) {
+                    texchange_node.partition_type == TPartitionType::BUCKET_SHUFFLE_HASH_PARTITIONED) {
                     part_type = texchange_node.partition_type;
                     lhs_need_local_shuffle = false;
                 }
@@ -261,7 +264,7 @@ pipeline::OpFactories MergeJoinNode::decompose_to_pipeline(pipeline::PipelineBui
 
             // Make sure that local shuffle use the same hash function as the remote exchange sink do远程？
             if (rhs_need_local_shuffle) {
-                if (part_type == TPartitionType::BUCKET_SHFFULE_HASH_PARTITIONED) {
+                if (part_type == TPartitionType::BUCKET_SHUFFLE_HASH_PARTITIONED) {
                     //DCHECK(!_build_equivalence_partition_expr_ctxs.empty());
                     rhs_operators = context->maybe_interpolate_local_shuffle_exchange(
                             runtime_state(), rhs_operators, _build_equivalence_partition_expr_ctxs, part_type);
@@ -271,7 +274,7 @@ pipeline::OpFactories MergeJoinNode::decompose_to_pipeline(pipeline::PipelineBui
                 }
             }
             if (lhs_need_local_shuffle) {
-                if (part_type == TPartitionType::BUCKET_SHFFULE_HASH_PARTITIONED) {
+                if (part_type == TPartitionType::BUCKET_SHUFFLE_HASH_PARTITIONED) {
                     //DCHECK(!_probe_equivalence_partition_expr_ctxs.empty());
                     lhs_operators = context->maybe_interpolate_local_shuffle_exchange(
                             runtime_state(), lhs_operators, _probe_equivalence_partition_expr_ctxs, part_type);
