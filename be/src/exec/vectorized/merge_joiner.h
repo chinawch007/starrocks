@@ -34,7 +34,12 @@ enum MergeJoinPhase {
     EOS = 4,
 };
 
-struct MergeJoinerParam {//看看具体哪些是用的到的。
+struct MergeTableSlotDescriptor {//暂时先放在这，看看node和joiner共享的其他成员是怎么定义的。
+    SlotDescriptor* slot;
+    bool need_output;
+};
+
+struct MergeJoinerParam {
     MergeJoinerParam(ObjectPool* pool, const TMergeJoinNode& merge_join_node, TPlanNodeId node_id,
                     const std::vector<ExprContext*>& build_expr_ctxs, const std::vector<ExprContext*>& probe_expr_ctxs,
                     const RowDescriptor& right_row_descriptor,
@@ -85,6 +90,7 @@ public:
     void enter_probe_phase() {
         auto old_phase = MergeJoinPhase::BUILD;
         _phase.compare_exchange_strong(old_phase, MergeJoinPhase::PROBE);
+        LOG(WARNING) << "joiner enter_probe_phase";
     }
     void enter_post_probe_phase() {
         MergeJoinPhase old_phase = MergeJoinPhase::PROBE;
@@ -93,9 +99,11 @@ public:
             // HashJoinProbeOperator finishes prematurely on runtime error or fragment's cancellation.
             _phase.compare_exchange_strong(old_phase, MergeJoinPhase::EOS);
         }
+        LOG(WARNING) << "joiner enter_post_probe_phase";
         Merge(&_result_chunk);//这俩谁先谁后呢？
     }
-    void enter_eos_phase() { 
+    void enter_eos_phase() {//关键要看这个函数是神么时候调用的嘛
+        LOG(WARNING) << "joiner enter_eos_phase";
         _phase = MergeJoinPhase::EOS; 
         set_finished();//也不知道这样合不合理，但这样build和probe就都可以停止了。
     }
@@ -123,16 +131,11 @@ private:
     const std::vector<ExprContext*>& _probe_expr_ctxs;//这里是引用，node那里是本体
     const std::vector<ExprContext*>& _build_expr_ctxs;
 
-    //fiter相关5个
-
     const RowDescriptor& _right_row_descriptor;//父类直接用child赋值的，所以父类不用有相应成员。
     const RowDescriptor& _left_row_descriptor;
     const std::set<SlotId>& _output_slots;
 
-    //filter相关4个
-    //一堆counter
-
-    Buffer<MergeTableSlotDescriptor> right_slots;
+    Buffer<MergeTableSlotDescriptor> right_slots;//也是要跟上边一样弄成引用的。
     Buffer<MergeTableSlotDescriptor> left_slots;
 };
 

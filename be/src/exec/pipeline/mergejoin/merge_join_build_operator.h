@@ -33,12 +33,12 @@ public:
         return false;
     }
     //这里其实有点矛盾，其实到了probe阶段就不会再接收数据了，我只能任务这里再调用过set_finishing之后就不会再调这个need_input了
-    bool need_input() const override { return !is_finished(); }
+    bool need_input() const override { LOG(WARNING) << "buildop need input?"; return !is_finished(); }
 
     //set_finished用父类的函数了
     Status set_finishing(RuntimeState* state) override;
     //我怀疑这里是轮询，并且是在joiner那边自我finished之后，所以
-    bool is_finished() const override { return _join_builder->is_finished(); }
+    bool is_finished() const override {  LOG(WARNING) << "buildop isfinished?";return _join_builder->is_finished(); }
 
     Status push_chunk(RuntimeState* state, const vectorized::ChunkPtr& chunk) override;
     StatusOr<vectorized::ChunkPtr> pull_chunk(RuntimeState* state) override;

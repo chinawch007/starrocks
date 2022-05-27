@@ -32,6 +32,7 @@ namespace starrocks::vectorized {
 MergeJoinNode::MergeJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
         : ExecNode(pool, tnode, descs),
           _merge_join_node(tnode.merge_join_node) {
+    LOG(WARNING) << "mjnode construct";
     if (tnode.merge_join_node.__isset.distribution_mode) {
         _distribution_mode = tnode.merge_join_node.distribution_mode;
     }
@@ -85,12 +86,17 @@ Status MergeJoinNode::prepare(RuntimeState* state) {
 }
 
 Status MergeJoinNode::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实话我很奇怪。。。你这里还是看起项目里其他函数的用法吧。
+    LOG(WARNING) << "mjnode merge";
     //获取两个chunk关联列中行的引用。
     //有没有能获取列类型的方式，这样我就能从两边chunk遍历列然后判断类型
     //可以用表达式直接从chunk上提取。
     //ColumnPtr column = _expr_ctxs->evaluate((*chunk).get());
-    ASSIGN_OR_RETURN(ColumnPtr left_column, _probe_expr_ctxs[0]->evaluate((_left_chunk).get()));
+    ASSIGN_OR_RETURN(ColumnPtr left_column, _probe_expr_ctxs[0]->evaluate((_left_chunk).get()));//假设等值条件，左右各有一列
+    LOG(WARNING) << "left_column data";
+    for(int i=0; i<left_column->size(); ++i){LOG(WARNING) << (left_column->get(i)).get_int64();}
     ASSIGN_OR_RETURN(ColumnPtr right_column, _build_expr_ctxs[0]->evaluate((_right_chunk).get()));
+    LOG(WARNING) << "right_column data";
+    for(int i=0; i<right_column->size(); ++i){LOG(WARNING) << (right_column->get(i)).get_int64();}
     //ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//把sptr传给*
     //ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
     int left_pos = 0, right_pos = 0;
@@ -110,6 +116,7 @@ Status MergeJoinNode::Merge(ChunkPtr* chunk) {//不用值传递而用指针，�
         } else {//这里建立两个列的索引吧，你这里的索引大小注意下，因为可能是整个chunk的
             index_left.push_back(left_pos);
             index_right.push_back(right_pos);
+            LOG(WARNING) << "equal index:" << left_pos << "|" << right_pos;
         }
     }
     //对左右chunk分别添加各个需要的列。
@@ -141,6 +148,7 @@ Status MergeJoinNode::Merge(ChunkPtr* chunk) {//不用值传递而用指针，�
 }
 
 Status MergeJoinNode::open(RuntimeState* state) {
+    LOG(WARNING) << "mjnode open";
     RETURN_IF_ERROR(ExecNode::open(state));
     RETURN_IF_ERROR(Expr::open(_build_expr_ctxs, state));//什么意涵？
     RETURN_IF_ERROR(Expr::open(_probe_expr_ctxs, state));
@@ -195,8 +203,9 @@ Status MergeJoinNode::open(RuntimeState* state) {
 
 Status MergeJoinNode::get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos) {
     RETURN_IF_CANCELLED(state);
+    LOG(WARNING) << "mjnode get_next";
 
-    if (_eos) {
+    if (_eos) {//这里应该是外部操作让我停止的。
         *eos = true;
         return Status::OK();
     }
@@ -204,13 +213,15 @@ Status MergeJoinNode::get_next(RuntimeState* state, ChunkPtr* chunk, bool* eos) 
     //我这里要返回对齐结果后的一定量的row，这个量该怎么确定。刚开始最简单情况，我可以都拉出来，没啥问题。
     *chunk = std::make_shared<Chunk>();
     (*chunk).swap(_result_chunk);
+    //再回来看的话感觉我这么写没什么问题，hj那边也是在一些步骤中去停止的。
+    //就是说我这次是全拉出来的。
     _eos = true;//这里自己操作了一下，为了上边的条件，先这么搞，看看具体需不需要吧。
-    *eos = false;
+    *eos = false;//你这么搞，这个函数会被调2次。
     return Status::OK();
 }
 
-
 Status MergeJoinNode::close(RuntimeState* state) {
+    LOG(WARNING) << "mjnode close";
     if (is_closed()) {
         return Status::OK();
     }

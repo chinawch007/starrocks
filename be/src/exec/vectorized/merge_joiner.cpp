@@ -65,7 +65,9 @@ MergeJoiner::MergeJoiner(const MergeJoinerParam& param)
 }
 
 Status MergeJoiner::prepare_builder(RuntimeState* state, RuntimeProfile* runtime_profile) {
+    LOG(WARNING) << "joiner prepare_builder";
     if (_runtime_state == nullptr) {
+        LOG(WARNING) << "joiner get runtime_state in build";
         _runtime_state = state;//这变量没看见用啊
     }
 
@@ -73,7 +75,9 @@ Status MergeJoiner::prepare_builder(RuntimeState* state, RuntimeProfile* runtime
 }
 
 Status MergeJoiner::prepare_prober(RuntimeState* state, RuntimeProfile* runtime_profile) {
+    LOG(WARNING) << "joiner prepare_prober";
     if (_runtime_state == nullptr) {
+        LOG(WARNING) << "joiner get runtime_state in probe";
         _runtime_state = state;
     }
 
@@ -82,6 +86,7 @@ Status MergeJoiner::prepare_prober(RuntimeState* state, RuntimeProfile* runtime_
 
 //就是组装个大chunk，得换个名
 Status MergeJoiner::append_chunk_to_buffer(RuntimeState* state, const vectorized::ChunkPtr& chunk) {
+    LOG(WARNING) << "joiner append_chunk_to_buffer";
     _right_chunk->append(*chunk);
     return Status::OK();
 }
@@ -91,7 +96,7 @@ bool MergeJoiner::need_input() const {
 }
 
 bool MergeJoiner::has_output() const {//此处要注意会不会出现eos阶段来取块的情况
-    if (_phase == MergeJoinPhase::POST_PROBE && _result_chunk != NULL) {
+    if (_phase == MergeJoinPhase::POST_PROBE && _result_chunk != NULL) {//注意下有没有同步风险
         return true;
     }
 
@@ -113,7 +118,11 @@ Status MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一�
     //有没有能获取列类型的方式，这样我就能从两边chunk遍历列然后判断类型
     //可以用表达式直接从chunk上提取。
     ASSIGN_OR_RETURN(ColumnPtr left_column, _probe_expr_ctxs[0]->evaluate((_left_chunk).get()));
+    LOG(WARNING) << "left_column data";
+    for(int i=0; i<left_column->size(); ++i){LOG(WARNING) << (left_column->get(i)).get_int64();}
     ASSIGN_OR_RETURN(ColumnPtr right_column, _build_expr_ctxs[0]->evaluate((_right_chunk).get()));
+    LOG(WARNING) << "right_column data";
+    for(int i=0; i<right_column->size(); ++i){LOG(WARNING) << (right_column->get(i)).get_int64();}
     //ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//这里都是默认一列了，这种写法肯定是有问题的。
     //ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
     int left_pos = 0, right_pos = 0;
@@ -127,10 +136,11 @@ Status MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一�
     while(1) {
         auto res = left_column->compare_at(left_pos, right_pos, *right_column, -1);
         if (res < 0) {
-            if(left_pos++ >= left_size)break;
+            if(++left_pos >= left_size)break;
         } else if (res > 0) {
-            if(right_pos++ >= right_size)break;
+            if(++right_pos >= right_size)break;
         } else {//这里建立两个列的索引吧，你这里的索引大小注意下，因为可能是整个chunk的
+            LOG(WARNING) << "equal index:" << left_pos << "|" << right_pos;
             index_left.push_back(left_pos);
             index_right.push_back(right_pos);
         }
@@ -143,16 +153,19 @@ Status MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一�
     for (auto merge_table_slot : right_slots) {  
         SlotDescriptor* slot = merge_table_slot.slot;//传进来的tupledesc哪去了？
         auto& column = _right_chunk->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
+        LOG(WARNING) << "right output slotid:" << slot->id();
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
             dest_column->append_selective(*column, index_right.data(), 0, index_right.size());//首参数引用？指针？
             (*chunk)->append_column(std::move(dest_column), slot->id());
         }
     }
+    //写个遍历块数据的函数吧，别嫌麻烦，打日志一波搞定！！！
 
     for (auto merge_table_slot : left_slots) {  
         SlotDescriptor* slot = merge_table_slot.slot;//传进来的tupledesc哪去了？
         auto& column = _left_chunk->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
+        LOG(WARNING) << "left output slotid:" << slot->id();
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
             dest_column->append_selective(*column, index_left.data(), 0, index_left.size());//首参数引用？指针？
@@ -176,6 +189,7 @@ Status MergeJoiner::Merge(ChunkPtr* chunk) {//两个排好序的chunk合成一�
 }
 
 void MergeJoiner::push_chunk(RuntimeState* state, ChunkPtr&& chunk) {
+    LOG(WARNING) << "joiner push_chunk";
     DCHECK(chunk && !chunk->is_empty());
 
     _left_chunk->append(*chunk);
@@ -185,6 +199,7 @@ void MergeJoiner::push_chunk(RuntimeState* state, ChunkPtr&& chunk) {
 //这也是用sptr的理由
 StatusOr<ChunkPtr> MergeJoiner::pull_chunk(RuntimeState* state) {
     //DCHECK(_phase != MergeJoinPhase::BUILD);
+    LOG(WARNING) << "joiner push_chunk";
     auto chunk = std::make_shared<Chunk>();
 
     if (_phase == MergeJoinPhase::PROBE || _result_chunk != nullptr) {
@@ -195,7 +210,7 @@ StatusOr<ChunkPtr> MergeJoiner::pull_chunk(RuntimeState* state) {
 }
 
 void MergeJoiner::close(RuntimeState* state) {
-    
+    LOG(WARNING) << "joiner close";
 }
 
 }
