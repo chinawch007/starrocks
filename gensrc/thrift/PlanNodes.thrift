@@ -433,7 +433,7 @@ struct TMergeJoinNode {
   52: optional TJoinDistributionMode distribution_mode;
   53: optional list<Exprs.TExpr> partition_exprs
   54: optional list<Types.TSlotId> output_columns
-  55: required list<TEqJoinCondition> cmp_conjuncts
+  //55: required list<TEqJoinCondition> cmp_conjuncts
 }
 
 enum TAggregationOp {

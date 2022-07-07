@@ -141,6 +141,7 @@ void PInternalServiceImplBase<T>::exec_plan_fragment(google::protobuf::RpcContro
                                                      const PExecPlanFragmentRequest* request,
                                                      PExecPlanFragmentResult* response,
                                                      google::protobuf::Closure* done) {
+    LOG(WARNING) << "internal service exec plan fragment";
     ClosureGuard closure_guard(done);
     brpc::Controller* cntl = static_cast<brpc::Controller*>(cntl_base);
     auto st = _exec_plan_fragment(cntl);

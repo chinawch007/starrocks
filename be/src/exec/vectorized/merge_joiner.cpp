@@ -25,8 +25,8 @@ namespace starrocks::vectorized {
 MergeJoiner::MergeJoiner(const MergeJoinerParam& param)
         : _merge_join_node(param._merge_join_node),
           _pool(param._pool),
-          _build_expr_ctxs(param._build_expr_ctxs),//看下怎么传过来有效的参数
           _probe_expr_ctxs(param._probe_expr_ctxs),
+          _build_expr_ctxs(param._build_expr_ctxs),//看下怎么传过来有效的参数
           _right_row_descriptor(param._right_row_descriptor),
           _left_row_descriptor(param._left_row_descriptor),
           _output_slots(param._output_slots) {

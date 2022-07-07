@@ -35,9 +35,11 @@ endif()
 project(starrocks CXX C)
 
 # set CMAKE_BUILD_TYPE
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE RELEASE)
-endif()
+#if (NOT CMAKE_BUILD_TYPE)
+#    set(CMAKE_BUILD_TYPE RELEASE)
+#endif()
+
+set(CMAKE_BUILD_TYPE "Debug")
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
 message(STATUS "Build type is ${CMAKE_BUILD_TYPE}")
