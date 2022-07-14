@@ -62,7 +62,7 @@ public:
     //  - If the current size is greater than count, the chunk is reduced to its first count elements.
     void set_num_rows(size_t count);
 
-    void swap_chunk(Chunk& other);
+    void swap_chunk(Chunk& other); //这个跟上边的转义构造
 
     const SchemaPtr& schema() const { return _schema; }
     SchemaPtr& schema() { return _schema; }
@@ -109,7 +109,7 @@ public:
     ColumnPtr& get_column_by_slot_id(SlotId slot_id);
 
     void set_slot_id_to_index(SlotId slot_id, size_t idx) { _slot_id_to_index[slot_id] = idx; }
-    bool is_slot_exist(SlotId id) const { return _slot_id_to_index.contains(id); }
+    bool is_slot_exist(SlotId id) const { LOG(WARNING) << "_slot_id_to_index size:" << _slot_id_to_index.size(); return _slot_id_to_index.contains(id); }
     bool is_tuple_exist(TupleId id) const { return _tuple_id_to_index.contains(id); }
     void reset_slot_id_to_index() { _slot_id_to_index.clear(); }
 

@@ -35,10 +35,14 @@ MergeJoinNode::MergeJoinNode(ObjectPool* pool, const TPlanNode& tnode, const Des
     if (tnode.merge_join_node.__isset.distribution_mode) {
         _distribution_mode = tnode.merge_join_node.distribution_mode;
     }
+    _right_chunk = std::make_shared<Chunk>();//这种单薄的初始化，其中的一些成员是否能正常用，比如schema之类的？
+    _left_chunk = std::make_shared<Chunk>();
+    _result_chunk = std::make_shared<Chunk>();
 }
 
 Status MergeJoinNode::init(const TPlanNode& tnode, RuntimeState* state) {
     RETURN_IF_ERROR(ExecNode::init(tnode, state));
+
     //下边的这两个赋值都跟hj那边保持一致了
     const std::vector<TEqJoinCondition>& eq_join_conjuncts = tnode.merge_join_node.eq_join_conjuncts;
     for (const auto& eq_join_conjunct : eq_join_conjuncts) {
@@ -71,6 +75,47 @@ Status MergeJoinNode::init(const TPlanNode& tnode, RuntimeState* state) {
     if (tnode.merge_join_node.__isset.output_columns) {//看下这个输出是怎么搞的
         _output_slots.insert(tnode.merge_join_node.output_columns.begin(), tnode.merge_join_node.output_columns.end());
     }
+
+    LOG(WARNING) << "mergejoin node row_desc:";
+    LOG(WARNING) << row_desc().debug_string();
+
+    LOG(WARNING) << "left child node row_desc:";
+    LOG(WARNING) << child(0)->row_desc().debug_string();
+
+    LOG(WARNING) << "right child node row_desc:";
+    LOG(WARNING) << child(1)->row_desc().debug_string();
+
+    for (const auto& tuple_desc : child(1)->row_desc().tuple_descriptors()) {
+        for (const auto& slot : tuple_desc->slots()) {
+            HashTableSlotDescriptor merge_table_slot;
+            merge_table_slot.slot = slot;
+            if (_output_slots.empty() ||
+                std::find(_output_slots.begin(), _output_slots.end(), slot->id()) !=
+                        _output_slots.end() ) {
+                merge_table_slot.need_output = true;
+            } else {
+                merge_table_slot.need_output = false;
+            }
+
+            right_slots.emplace_back(merge_table_slot);
+        }
+    }
+
+    for (const auto& tuple_desc : child(0)->row_desc().tuple_descriptors()) {
+        for (const auto& slot : tuple_desc->slots()) {
+            HashTableSlotDescriptor merge_table_slot;
+            merge_table_slot.slot = slot;
+            if (_output_slots.empty() ||
+                std::find(_output_slots.begin(), _output_slots.end(), slot->id()) !=
+                        _output_slots.end() ) {
+                merge_table_slot.need_output = true;
+            } else {
+                merge_table_slot.need_output = false;
+            }
+
+            left_slots.emplace_back(merge_table_slot);
+        }
+    }
     return Status::OK();
 }
 
@@ -86,18 +131,17 @@ Status MergeJoinNode::prepare(RuntimeState* state) {
 
 Status MergeJoinNode::Merge(ChunkPtr* chunk) {//不用值传递而用指针，说实话我很奇怪。。。你这里还是看起项目里其他函数的用法吧。
     LOG(WARNING) << "mjnode merge";
-    //获取两个chunk关联列中行的引用。
-    //有没有能获取列类型的方式，这样我就能从两边chunk遍历列然后判断类型
-    //可以用表达式直接从chunk上提取。
-    //ColumnPtr column = _expr_ctxs->evaluate((*chunk).get());
+    
     ASSIGN_OR_RETURN(ColumnPtr left_column, _probe_expr_ctxs[0]->evaluate((_left_chunk).get()));//假设等值条件，左右各有一列
+    
     LOG(WARNING) << "left_column data";
     for(int i=0; i<left_column->size(); ++i){LOG(WARNING) << (left_column->get(i)).get_int64();}
+
     ASSIGN_OR_RETURN(ColumnPtr right_column, _build_expr_ctxs[0]->evaluate((_right_chunk).get()));
+
     LOG(WARNING) << "right_column data";
     for(int i=0; i<right_column->size(); ++i){LOG(WARNING) << (right_column->get(i)).get_int64();}
-    //ColumnPtr left_column = _probe_expr_ctxs[0]->evaluate((_left_chunk).get());//把sptr传给*
-    //ColumnPtr right_column = _build_expr_ctxs[0]->evaluate((_right_chunk).get());
+    
     int left_pos = 0, right_pos = 0;
     int left_size = left_column->size(), right_size = right_column->size();
 
@@ -123,24 +167,35 @@ Status MergeJoinNode::Merge(ChunkPtr* chunk) {//不用值传递而用指针，�
     //确实是不能用。。。
     //chunk->append_selective(left_chunk, index_left, 0, index_left.size());
 
+    //再回来看就会好奇为啥这两个slot是有效的。。。
     for (auto merge_table_slot : right_slots) {  
         SlotDescriptor* slot = merge_table_slot.slot;//传进来的tupledesc哪去了？
+        LOG(WARNING) << "slotid:" << slot->id();
         auto& column = _right_chunk->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
+        LOG(WARNING) << "column:" << column.debug_string();
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
-            ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
+            ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//这里使用了solt的type来创建column，跟column就是同一类了。
             dest_column->append_selective(*column, index_right.data(), 0, index_right.size());//首参数引用？指针？
             (*chunk)->append_column(std::move(dest_column), slot->id());
         }
     }
 
+    //我之前应该是想到过的，会不会append重复列
     for (auto merge_table_slot : left_slots) {  
         SlotDescriptor* slot = merge_table_slot.slot;//传进来的tupledesc哪去了？
+        LOG(WARNING) << "slotid:" << slot->id();
         auto& column = _left_chunk->get_column_by_slot_id(slot->id());//这里的关联你需要确认下。
+        LOG(WARNING) << "column:" << column.debug_string();
         if (merge_table_slot.need_output) {//从tplan一层层传下来的，就是说具体输出列，是由fe端控制的。
             ColumnPtr dest_column = ColumnHelper::create_column(slot->type(), false);//看一下这个2参
             dest_column->append_selective(*column, index_left.data(), 0, index_left.size());//首参数引用？指针？
             (*chunk)->append_column(std::move(dest_column), slot->id());
         }
+    }
+
+    LOG(WARNING) << "debug chunk:";
+    for(int i = 0; i < chunk->_columns.size(); ++i) {
+        LOG(WARNING) << "column:" << i << ":" << column.debug_string();
     }
 
     return Status::OK();
@@ -162,16 +217,22 @@ Status MergeJoinNode::open(RuntimeState* state) {
             // fetch chunk of right table
             RETURN_IF_ERROR(child(1)->get_next(state, &chunk, &eos));//这里的目的是为了把所有的数据囤积起来,
             if (eos) {
+                LOG(WARNING) << "left meet eos, break";
                 break;
             }
 
             if (chunk->num_rows() <= 0) {//这种情况难道并不表示没拿到数据吗？
+                LOG(WARNING) << "left num_rows <= 0?";
                 continue;
             }
         }
 
         //这里是要有一个right_chunk来积累上边拿到的chunk
-        _right_chunk->append(*chunk);
+        LOG(WARNING) << "left before chunk append";
+        //第一次的话需要一个初始化，看看有没有有一个转义或赋值函数
+        //里边的schema之类的成员我是从下边拿，还是从fe端发过来的参数拿
+        //_right_chunk->append(*chunk);//在另一边你会实际看到，append chunk也是由append column实现的。
+        _right_chunk->swap_chunk(*chunk);
     }
 
     RETURN_IF_ERROR(child(0)->open(state));
@@ -183,19 +244,23 @@ Status MergeJoinNode::open(RuntimeState* state) {
             // fetch chunk of left table
             RETURN_IF_ERROR(child(0)->get_next(state, &chunk, &eos));//这里的目的是为了把所有的数据囤积起来,
             if (eos) {
+                LOG(WARNING) << "right meet eos, break";
                 break;
             }
 
             if (chunk->num_rows() <= 0) {//这种情况难道并不表示没拿到数据吗？
+                LOG(WARNING) << "right num_rows <= 0?";
                 continue;
             }
         }
 
         //这里是要有一个left_chunk来积累上边拿到的chunk
-        _left_chunk->append(*chunk);
+        LOG(WARNING) << "right before chunk append";
+        //_left_chunk->append(*chunk);
+        _left_chunk->swap_chunk(*chunk);
     }
     //这里是要做一个对齐操作的。
-    Merge(&_result_chunk);
+    Merge(&_result_chunk);//result想办法初始化下，看看hj怎么做的。---从getNext来的-----append column或许不会要求那么高?
 
     return Status::OK();
 }
